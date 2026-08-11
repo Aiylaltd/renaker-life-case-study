@@ -14,8 +14,8 @@ export const prologueLoadingPhrases = [
 
 export const prologueOrientation = {
   brand: "Renaker Life",
-  headline: "A digital experience built to match the buildings.",
-  body: "Renaker, one of Manchester’s leading residential developers, partnered with Aiyla to create a digital experience worthy of its buildings — replacing fragmented systems with one intelligent platform and transforming how residents live, teams operate and management understands the estate.",
+  headline: "A Digital Experience to Match Incredible Buildings",
+  body: "Renaker, one of the UK’s leading residential developers, partnered with Aiyla to create a digital experience worthy of its buildings — replacing fragmented systems with one intelligent platform and transforming how residents live, teams operate and management understands the estate.",
   continueHint: "Scroll to continue",
   stats: [
     { value: "7", label: "Developments" },
