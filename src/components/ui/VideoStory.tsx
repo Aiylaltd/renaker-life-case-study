@@ -28,8 +28,7 @@ export function VideoStory({ story }: { story: VideoStoryConfig }) {
             {story.title}
           </h3>
           <p className="mt-3 text-body text-ink/70">{story.preview}</p>
-          {/* Captions architecture ready for future video element */}
-          <track kind="captions" />
+          {/* Captions: attach <track kind="captions"> when video sources arrive */}
         </div>
       </GlassPanel>
     </article>

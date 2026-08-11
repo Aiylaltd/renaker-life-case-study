@@ -48,10 +48,18 @@ class AnchorRegistryImpl {
 
   private resolveNames(objectName: string): AnchorName[] {
     const name = objectName.trim();
+    // Blender empty for New Jackson — slash may be rewritten by exporters/loaders
+    if (
+      /anchor[_\s-]*blade/i.test(name) &&
+      (/360|three\s*60/i.test(name) || /blade[\/_\\-]+360/i.test(name))
+    ) {
+      return ["ANCHOR_BLADE", "ANCHOR_360"];
+    }
     if (
       name === "ANCHOR_BLADE/360" ||
       name === "ANCHOR_BLADE_360" ||
-      name === "ANCHOR_BLADE-360"
+      name === "ANCHOR_BLADE-360" ||
+      name === "ANCHOR_BLADE\\360"
     ) {
       return ["ANCHOR_BLADE", "ANCHOR_360"];
     }
@@ -62,35 +70,42 @@ class AnchorRegistryImpl {
   }
 
   /**
-   * Raycast down through the city at XZ to find the Terrain / street surface.
-   * Prefer Terrain hits so we don't land on building roofs.
+   * Raycast down through the city at XZ to find Terrain (preferred), then roads.
+   * Never land on OSM building roofs near tower sites.
    */
   private sampleGroundY(
     x: number,
     z: number,
     meshes: THREE.Object3D[],
   ): number | null {
-    _origin.set(x, 400, z);
+    _origin.set(x, 800, z);
     _raycaster.set(_origin, _down);
     const hits = _raycaster.intersectObjects(meshes, false);
     if (!hits.length) return null;
 
-    const terrainHit = hits.find((h) => {
-      const n = (h.object.name || h.object.parent?.name || "").toLowerCase();
-      return n.includes("terrain");
-    });
-    const roadHit = hits.find((h) => {
-      const n = (h.object.name || h.object.parent?.name || "").toLowerCase();
+    const label = (h: THREE.Intersection) =>
+      `${h.object.name || ""} ${h.object.parent?.name || ""}`.toLowerCase();
+
+    const terrainHit = hits.find((h) => label(h).includes("terrain"));
+    if (terrainHit) return terrainHit.point.y + 0.05;
+
+    const deckHit = hits.find((h) => {
+      const n = label(h);
       return (
         n.includes("road") ||
         n.includes("motorway") ||
-        n.includes("pedestrian")
+        n.includes("pedestrian") ||
+        n.includes("areas")
       );
     });
+    if (deckHit) return deckHit.point.y + 0.05;
 
-    // Tiny lift to avoid z-fighting with the deck
-    const hit = terrainHit ?? roadHit ?? hits[0];
-    return hit.point.y + 0.15;
+    // Last resort: lowest hit (avoid rooftops when several stacks)
+    let lowest = hits[0];
+    for (const h of hits) {
+      if (h.point.y < lowest.point.y) lowest = h;
+    }
+    return lowest.point.y + 0.05;
   }
 
   /**
@@ -107,12 +122,20 @@ class AnchorRegistryImpl {
       if (!mesh.isMesh || mesh.visible === false) return;
       // Skip invisible anchor helpers
       if (mesh.name.startsWith("ANCHOR_")) return;
+      const n = `${mesh.name} ${mesh.parent?.name || ""}`.toLowerCase();
+      // Never sample building roofs for foot height
+      if (n.includes("building") || n.includes("osm_buildings")) return;
       meshes.push(mesh);
     });
 
     const groundSamples: number[] = [];
 
     root.traverse((obj) => {
+      if (/anchor/i.test(obj.name) && !this.resolveNames(obj.name).length) {
+        console.warn(
+          `[AnchorRegistry] Unresolved anchor-like object "${obj.name}"`,
+        );
+      }
       const names = this.resolveNames(obj.name);
       if (!names.length) return;
 

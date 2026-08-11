@@ -1,22 +1,30 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { sections } from "@/config/caseStudy";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { useScrollStore } from "@/store/scrollStore";
+
+/** Spread layout (% of stage) so chips don’t pile into one clump */
+const CHIP_LAYOUT = [
+  { x: -42, y: -38, rot: -6 },
+  { x: -8, y: -48, rot: 3 },
+  { x: 36, y: -34, rot: 7 },
+  { x: -48, y: -6, rot: -4 },
+  { x: 4, y: -12, rot: 2 },
+  { x: 46, y: 2, rot: 5 },
+  { x: -36, y: 28, rot: -7 },
+  { x: 10, y: 34, rot: 4 },
+  { x: 40, y: 40, rot: -3 },
+  { x: -12, y: 48, rot: 6 },
+] as const;
 
 export function ProblemSection() {
   const progress = useScrollStore((s) =>
     s.sectionId === "problem" ? s.sectionProgress : 0,
   );
-  const consolidated = progress > 0.45;
-  const [offsets] = useState(() =>
-    sections.problem.channels.map((_, i) => ({
-      x: ((i * 37) % 80) - 40,
-      y: ((i * 53) % 60) - 30,
-      rot: ((i * 17) % 16) - 8,
-    })),
-  );
+  const inSection = useScrollStore((s) => s.sectionId === "problem");
+  const consolidated = inSection && progress > 0.42;
+  const channels = sections.problem.channels;
 
   return (
     <section
@@ -28,12 +36,12 @@ export function ProblemSection() {
         <div className="container-editorial w-full">
           <div
             className={`transition-opacity duration-700 ${
-              consolidated ? "opacity-0 absolute" : "opacity-100"
+              consolidated ? "pointer-events-none opacity-0" : "opacity-100"
             }`}
           >
             <h2
               id="problem-heading"
-              className="text-display editorial-type whitespace-pre-line max-w-3xl"
+              className="max-w-3xl whitespace-pre-line text-display editorial-type"
             >
               {sections.problem.headline}
             </h2>
@@ -42,19 +50,20 @@ export function ProblemSection() {
             </p>
           </div>
 
-          <div className="relative mt-12 min-h-[280px] md:min-h-[340px]">
-            {sections.problem.channels.map((channel, i) => {
-              const o = offsets[i];
+          <div className="relative mx-auto mt-14 min-h-[320px] w-full max-w-2xl md:min-h-[380px]">
+            {channels.map((channel, i) => {
+              const o = CHIP_LAYOUT[i % CHIP_LAYOUT.length];
               return (
                 <span
                   key={channel}
-                  className="channel-chip absolute left-1/2 top-1/2 transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  className="channel-chip absolute left-1/2 top-1/2 whitespace-nowrap transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)]"
                   style={{
                     transform: consolidated
-                      ? "translate(-50%, -50%) scale(0.4)"
-                      : `translate(calc(-50% + ${o.x}px), calc(-50% + ${o.y}px)) rotate(${o.rot}deg)`,
+                      ? "translate(-50%, -50%) scale(0.35)"
+                      : `translate(calc(-50% + ${o.x}%), calc(-50% + ${o.y}%)) rotate(${o.rot}deg)`,
                     opacity: consolidated ? 0 : 1,
-                    transitionDelay: `${i * 40}ms`,
+                    transitionDelay: `${i * 35}ms`,
+                    zIndex: channels.length - i,
                   }}
                 >
                   {channel}
@@ -63,15 +72,18 @@ export function ProblemSection() {
             })}
 
             <div
-              className={`absolute left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 transition-all duration-1000 ${
-                consolidated
-                  ? "opacity-100 translate-y-[-50%]"
-                  : "opacity-0 translate-y-[-40%]"
-              }`}
+              className="absolute left-1/2 top-1/2 w-full max-w-md transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)]"
+              style={{
+                opacity: consolidated ? 1 : 0,
+                transform: consolidated
+                  ? "translate(-50%, -50%) scale(1)"
+                  : "translate(-50%, -42%) scale(0.96)",
+                pointerEvents: consolidated ? "auto" : "none",
+              }}
             >
-              <GlassPanel variant="light" className="p-6 md:p-8 text-center">
+              <GlassPanel variant="light" className="p-6 text-center md:p-8">
                 <p className="text-label text-muted-dark">Renaker Life</p>
-                <h3 className="mt-3 text-headline whitespace-pre-line">
+                <h3 className="mt-3 whitespace-pre-line text-headline">
                   {sections.problem.resolvedHeadline}
                 </h3>
                 <p className="mt-4 text-body text-ink/70">

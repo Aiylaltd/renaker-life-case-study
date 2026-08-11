@@ -6,25 +6,48 @@ import * as THREE from "three";
 import { useScrollStore } from "@/store/scrollStore";
 import { AnchorRegistry } from "@/scene/AnchorRegistry";
 import { cameraDefaults } from "@/config/scene";
-import { developments, getDevelopmentByAnchor } from "@/config/developments";
+import { getDevelopmentByAnchor } from "@/config/developments";
+import type { AnchorName } from "@/config/scene";
 
-const _pos = new THREE.Vector3();
 const _desiredPos = new THREE.Vector3();
 const _desiredTarget = new THREE.Vector3();
 const _offset = new THREE.Vector3();
 const _orbited = new THREE.Vector3();
+const _toPos = new THREE.Vector3();
+const _toLook = new THREE.Vector3();
+const _fromPos = new THREE.Vector3();
+const _fromTarget = new THREE.Vector3();
+const _towerPos = new THREE.Vector3();
+const _towerTarget = new THREE.Vector3();
 
 function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 }
 
 /**
- * Estate beat within a single building's scroll slice:
- * approach → arrive → orbit → hold → depart
+ * Wide opening frame from the far (north) end of the city,
+ * looking south toward Deansgate Square — towers read in the distance
+ * with the city fabric filling the foreground.
  */
-function estateComposition(buildingProgress: number, active: string) {
-  const dev = getDevelopmentByAnchor(active as (typeof developments)[0]["anchor"]);
-  const a = AnchorRegistry.getPosition(active as (typeof developments)[0]["anchor"]);
+function revealFrame(t: number) {
+  const e = easeInOutCubic(THREE.MathUtils.clamp(t, 0, 1));
+  const dgs = AnchorRegistry.getPosition("ANCHOR_DGS");
+
+  _fromPos.set(
+    dgs.x + THREE.MathUtils.lerp(480, 400, e),
+    THREE.MathUtils.lerp(680, 580, e),
+    dgs.z + THREE.MathUtils.lerp(-1180, -1020, e),
+  );
+  _fromTarget.set(
+    dgs.x,
+    dgs.y + THREE.MathUtils.lerp(30, 55, e),
+    dgs.z,
+  );
+}
+
+function towerArrivalFrame(active: AnchorName, buildingProgress: number) {
+  const dev = getDevelopmentByAnchor(active);
+  const a = AnchorRegistry.getPosition(active);
   const cam = dev?.camera ?? {
     arrivalOffset: cameraDefaults.towerOffset.position,
     orbitStartDeg: -10,
@@ -39,32 +62,8 @@ function estateComposition(buildingProgress: number, active: string) {
   };
 
   const p = THREE.MathUtils.clamp(buildingProgress, 0, 1);
-  // Phase weights
-  let phase: "approach" | "arrive" | "orbit" | "hold" | "depart" = "approach";
-  let orbitT = 0;
-  let approachT = 0;
-
-  if (p < 0.18) {
-    phase = "approach";
-    approachT = easeInOutCubic(p / 0.18);
-  } else if (p < 0.3) {
-    phase = "arrive";
-    approachT = 1;
-    orbitT = 0;
-  } else if (p < 0.72) {
-    phase = "orbit";
-    approachT = 1;
-    orbitT = easeInOutCubic((p - 0.3) / 0.42);
-  } else if (p < 0.88) {
-    phase = "hold";
-    approachT = 1;
-    orbitT = 1;
-  } else {
-    phase = "depart";
-    approachT = 1;
-    orbitT = 1;
-  }
-
+  // Slow, shallow orbit — ease across most of the stop so it never feels twitchy
+  const orbitT = easeInOutCubic(THREE.MathUtils.clamp((p - 0.2) / 0.9, 0, 1));
   const orbitDeg = THREE.MathUtils.lerp(
     cam.orbitStartDeg,
     cam.orbitEndDeg,
@@ -73,43 +72,53 @@ function estateComposition(buildingProgress: number, active: string) {
   const orbitRad = THREE.MathUtils.degToRad(orbitDeg);
 
   _offset.set(...cam.arrivalOffset);
-  // Pull back slightly on approach / push on depart
-  if (phase === "approach") {
-    _offset.multiplyScalar(THREE.MathUtils.lerp(1.55, 1, approachT));
-    _offset.y *= THREE.MathUtils.lerp(1.35, 1, approachT);
-  } else if (phase === "depart") {
-    const d = (p - 0.88) / 0.12;
-    _offset.multiplyScalar(THREE.MathUtils.lerp(1, 1.35, d));
-    _offset.y *= THREE.MathUtils.lerp(1, 1.25, d);
-  }
-
+  // Milder push-in so arrival doesn't lunge
+  const widen = THREE.MathUtils.lerp(
+    1.12,
+    1,
+    easeInOutCubic(Math.min(1, p / 0.65)),
+  );
   _orbited.set(
-    _offset.x * Math.cos(orbitRad) - _offset.z * Math.sin(orbitRad),
-    _offset.y,
-    _offset.x * Math.sin(orbitRad) + _offset.z * Math.cos(orbitRad),
+    (_offset.x * Math.cos(orbitRad) - _offset.z * Math.sin(orbitRad)) * widen,
+    _offset.y * THREE.MathUtils.lerp(1.06, 1, Math.min(1, p / 0.6)),
+    (_offset.x * Math.sin(orbitRad) + _offset.z * Math.cos(orbitRad)) * widen,
   );
 
-  // Offsets are authored relative to deck; a.y is the measured plinth top
-  _desiredPos.set(
-    a.x + _orbited.x,
-    a.y + _orbited.y,
-    a.z + _orbited.z,
-  );
-  _desiredTarget.set(
+  _towerPos.set(a.x + _orbited.x, a.y + _orbited.y, a.z + _orbited.z);
+  _towerTarget.set(
     a.x + cam.targetOffset[0],
     a.y + cam.targetOffset[1],
     a.z + cam.targetOffset[2],
   );
 
-  // Heavy camera — low responsiveness
-  const lerp =
-    phase === "orbit" || phase === "hold"
-      ? 0.014
-      : phase === "approach"
-        ? 0.018
-        : 0.016;
+  return { fov: cam.fov };
+}
 
-  return { lerp, fov: cam.fov };
+/**
+ * Settled framing per building — light orbit after arrival.
+ */
+function estateComposition(buildingProgress: number, active: AnchorName) {
+  const { fov } = towerArrivalFrame(active, buildingProgress);
+  _desiredPos.copy(_towerPos);
+  _desiredTarget.copy(_towerTarget);
+  return { lerp: 0.026, fov };
+}
+
+/**
+ * Cover → first tower: blend wide reveal into DGS arrival.
+ */
+function approachComposition(buildingProgress: number, active: AnchorName) {
+  revealFrame(1);
+  const { fov } = towerArrivalFrame(active, buildingProgress);
+  const blend = easeInOutCubic(THREE.MathUtils.clamp(buildingProgress / 0.55, 0, 1));
+
+  _desiredPos.lerpVectors(_fromPos, _towerPos, blend);
+  _desiredTarget.lerpVectors(_fromTarget, _towerTarget, blend);
+
+  return {
+    lerp: THREE.MathUtils.lerp(0.024, 0.038, blend),
+    fov: THREE.MathUtils.lerp(48, fov, blend),
+  };
 }
 
 function compositionForState(): {
@@ -121,7 +130,7 @@ function compositionForState(): {
   const active = state.activeDevelopment;
   const mode = state.sceneMode;
   const reduced = state.qualityProfile === "reduced";
-  const cover = state.coverReveal; // 0 dark → 1 light
+  const cover = state.coverReveal;
 
   _desiredPos.set(...overview.position);
   _desiredTarget.set(...overview.target);
@@ -129,35 +138,27 @@ function compositionForState(): {
   let fov = cameraDefaults.fov;
 
   if (mode === "cover" || mode === "loading") {
-    // Dark opening — high, slow drift over the city
-    _desiredPos.set(-80, 380 + (1 - cover) * 80, 520);
-    _desiredTarget.set(40, 30, 40);
-    const t = performance.now() * 0.00008;
-    _desiredPos.x += Math.sin(t) * 12;
-    _desiredPos.z += Math.cos(t * 0.7) * 10;
-    lerp = 0.012;
-    fov = 44;
-  } else if (mode === "reveal") {
-    // Dark → light push-in
-    const t = THREE.MathUtils.clamp(state.sectionProgress, 0, 1);
-    const e = easeInOutCubic(t);
-    _desiredPos.set(
-      THREE.MathUtils.lerp(-80, 60, e),
-      THREE.MathUtils.lerp(420, 320, e),
-      THREE.MathUtils.lerp(520, 640, e),
-    );
-    _desiredTarget.set(
-      THREE.MathUtils.lerp(40, 20, e),
-      THREE.MathUtils.lerp(30, 50, e),
-      THREE.MathUtils.lerp(40, 0, e),
-    );
+    const dgs = AnchorRegistry.getPosition("ANCHOR_DGS");
+    const height = 580 + (1 - cover) * 100;
+    _desiredPos.set(dgs.x + 480, height, dgs.z - 1180);
+    _desiredTarget.set(dgs.x, dgs.y + 30, dgs.z);
     lerp = 0.02;
+    fov = 48;
+  } else if (mode === "reveal") {
+    const t = THREE.MathUtils.clamp(state.sectionProgress, 0, 1);
+    revealFrame(t);
+    _desiredPos.copy(_fromPos);
+    _desiredTarget.copy(_fromTarget);
+    lerp = 0.03;
+    fov = 48;
+  } else if (mode === "approach" && active) {
+    return approachComposition(state.estateBuildingProgress, active);
   } else if (mode === "estate" && active) {
     return estateComposition(state.estateBuildingProgress, active);
   } else if (mode === "estate-overview") {
     _desiredPos.set(-40, 520, 780);
     _desiredTarget.set(-200, 40, 200);
-    lerp = 0.014;
+    lerp = 0.032;
   } else if (mode === "home" && active) {
     const a = AnchorRegistry.getPosition(active);
     _desiredPos.set(a.x + 110, 140, a.z + 180);
@@ -187,12 +188,10 @@ function compositionForState(): {
   } else if (mode === "quiet" || mode === "overview") {
     _desiredPos.set(-120, 400, 620);
     _desiredTarget.set(40, 40, -20);
-    lerp = state.attentionMode === "editorial" ? 0.008 : 0.012;
-    if (state.attentionMode !== "editorial") {
-      const t = performance.now() * 0.0001;
-      _desiredPos.x += Math.sin(t) * 6;
-      _desiredPos.z += Math.cos(t * 0.8) * 5;
-    }
+    lerp =
+      state.attentionMode === "editorial" || state.sectionId === "problem"
+        ? 0.04
+        : 0.018;
   }
 
   return { lerp, fov };
@@ -205,22 +204,38 @@ export function CameraDirector() {
   const debugTimer = useRef(0);
   const vel = useRef(new THREE.Vector3());
   const lookVel = useRef(new THREE.Vector3());
+  const lastActive = useRef<string | null>(null);
+  const lastMode = useRef<string | null>(null);
 
   useFrame((_, delta) => {
-    const { lerp, fov } = compositionForState();
-    // Critically-damped spring feel — scroll cannot yank the camera
+    const state = useScrollStore.getState();
+    const active = state.activeDevelopment;
+    let { lerp, fov } = compositionForState();
+
+    if (active !== lastActive.current) {
+      lastActive.current = active;
+      // Soft handoff between towers — never punch the lerp up
+      lerp = Math.min(lerp, state.sceneMode === "approach" ? 0.022 : 0.03);
+    }
+
+    if (state.sceneMode !== lastMode.current) {
+      lastMode.current = state.sceneMode;
+      if (state.sceneMode === "approach" || state.sceneMode === "reveal") {
+        lerp = Math.min(lerp, 0.024);
+      }
+    }
+
     const dt = Math.min(delta, 0.05);
     const smooth = 1 - Math.exp(-lerp * 60 * dt);
 
-    // Secondary inertia on position
-    const toPos = _desiredPos.clone().sub(camera.position);
-    vel.current.lerp(toPos, smooth);
+    _toPos.copy(_desiredPos).sub(camera.position);
+    vel.current.lerp(_toPos, smooth);
     camera.position.addScaledVector(vel.current, smooth);
 
-    lookAt.current.lerp(_desiredTarget, smooth * 0.85);
-    const toLook = _desiredTarget.clone().sub(lookAt.current);
-    lookVel.current.lerp(toLook, smooth);
-    lookAt.current.addScaledVector(lookVel.current, smooth * 0.35);
+    lookAt.current.lerp(_desiredTarget, smooth * 0.9);
+    _toLook.copy(_desiredTarget).sub(lookAt.current);
+    lookVel.current.lerp(_toLook, smooth);
+    lookAt.current.addScaledVector(lookVel.current, smooth * 0.3);
     camera.lookAt(lookAt.current);
 
     if ("fov" in camera) {
@@ -230,7 +245,7 @@ export function CameraDirector() {
     }
 
     debugTimer.current += delta;
-    if (debugTimer.current > 0.25) {
+    if (debugTimer.current > 0.75) {
       debugTimer.current = 0;
       setCameraDebug(
         [camera.position.x, camera.position.y, camera.position.z],

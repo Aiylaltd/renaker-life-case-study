@@ -3,12 +3,16 @@
 import { useEffect } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { developments } from "@/config/developments";
+import { estateTourDevelopments } from "@/config/developments";
 import { useScrollStore } from "@/store/scrollStore";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { AnchorName } from "@/config/scene";
 
 gsap.registerPlugin(ScrollTrigger);
+
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
 
 export function useScrollStory(enabled: boolean) {
   const reduced = useReducedMotion();
@@ -33,6 +37,7 @@ export function useScrollStory(enabled: boolean) {
     if (!enabled) return;
 
     const triggers: ScrollTrigger[] = [];
+    const firstTower = estateTourDevelopments[0]?.anchor as AnchorName | undefined;
 
     const watch = (
       id: string,
@@ -71,46 +76,89 @@ export function useScrollStory(enabled: boolean) {
       }),
     );
 
-    // Dark → light reveal
+    // Dark → light reveal (needs real height — see .story-section--cover)
     const cover = document.getElementById("section-cover");
     if (cover) {
       triggers.push(
         ScrollTrigger.create({
           trigger: cover,
           start: "top top",
-          end: "bottom bottom",
+          end: "bottom top",
           onEnter: () => {
-            setSceneMode("reveal");
             setAttentionMode("cinematic");
             setSection("cover", 0);
+            setActiveDevelopment(null);
           },
           onEnterBack: () => {
-            setSceneMode("reveal");
             setAttentionMode("cinematic");
+            setSection("cover", 1);
+            setActiveDevelopment(null);
+            setEstateBuildingProgress(0);
           },
           onUpdate: (self) => {
             const p = self.progress;
+            const reveal = clamp01(p * 1.15);
             setSection("cover", p);
-            setCoverReveal(Math.min(1, p * 1.15));
-            setCityAwake(p * 0.5);
-            setSceneMode(p < 0.95 ? "reveal" : "overview");
+            setCoverReveal(reveal);
+            setCityAwake(p * 0.55);
+
+            // Late cover: ease toward first tower instead of hard-cutting on hero enter
+            if (p < 0.08) {
+              setSceneMode("cover");
+              setActiveDevelopment(null);
+              setEstateBuildingProgress(0);
+            } else if (p < 0.62) {
+              setSceneMode("reveal");
+              setActiveDevelopment(null);
+              setEstateBuildingProgress(0);
+            } else {
+              setSceneMode("approach");
+              if (firstTower) setActiveDevelopment(firstTower);
+              setEstateBuildingProgress(clamp01((p - 0.62) / 0.38) * 0.45);
+            }
           },
           onLeave: () => {
             setCoverReveal(1);
             setCityAwake(0.55);
           },
+          onLeaveBack: () => {
+            setCoverReveal(0);
+            setCityAwake(0);
+            setSceneMode("cover");
+            setActiveDevelopment(null);
+            setEstateBuildingProgress(0);
+          },
         }),
       );
     }
 
-    // Slow estate tour — each building gets a full progress slice
+    // Estate tour — snap between developments; allow escape back into cover
     const hero = document.getElementById("section-hero");
+    const tour = estateTourDevelopments;
+    const tourStops = tour.length + 1; // buildings + overview
+    const stopInc = 1 / (tourStops - 1);
     if (hero) {
       triggers.push(
         ScrollTrigger.create({
           trigger: hero,
           start: "top top",
           end: "bottom bottom",
+          ...(reduced
+            ? {}
+            : {
+                snap: {
+                  snapTo: (value: number) => {
+                    // Near the top: don't yank the user back into the first tower
+                    // when they're trying to return to the cover.
+                    if (value < stopInc * 0.35) return 0;
+                    return Math.round(value / stopInc) * stopInc;
+                  },
+                  duration: { min: 0.4, max: 0.85 },
+                  ease: "power2.inOut",
+                  delay: 0.02,
+                  directional: true,
+                },
+              }),
           onEnter: () => {
             setAttentionMode("cinematic");
             setCoverReveal(1);
@@ -118,7 +166,14 @@ export function useScrollStory(enabled: boolean) {
           },
           onEnterBack: () => {
             setAttentionMode("cinematic");
+            setCoverReveal(1);
             setSceneMode(reduced ? "quiet" : "estate");
+          },
+          onLeaveBack: () => {
+            // Hand control back to the cover trigger
+            setActiveDevelopment(null);
+            setEstateBuildingProgress(0);
+            setAttentionMode("cinematic");
           },
           onUpdate: (self) => {
             const p = self.progress;
@@ -131,8 +186,11 @@ export function useScrollStory(enabled: boolean) {
               return;
             }
 
-            // Final slice = estate overview
-            if (p > 0.9) {
+            const slot = p * (tourStops - 1);
+            const stop = Math.min(tourStops - 1, Math.round(slot));
+
+            // Last stop = whole-estate overview
+            if (stop >= tour.length) {
               setSceneMode("estate-overview");
               setActiveDevelopment(null);
               setEstateBuildingProgress(0);
@@ -140,16 +198,28 @@ export function useScrollStory(enabled: boolean) {
               return;
             }
 
-            const tourP = p / 0.9;
-            const count = developments.length;
-            const scaled = tourP * count;
-            const idx = Math.min(count - 1, Math.floor(scaled));
-            const local = scaled - idx;
+            // First tower: short approach only while arriving from cover, then settle
+            if (stop === 0 && slot < 0.18) {
+              setSceneMode(slot < 0.06 ? "estate" : "approach");
+              setActiveDevelopment(tour[0].anchor as AnchorName);
+              setEstateBuildingProgress(
+                clamp01(0.5 + Math.min(slot, 0.12) * 0.4),
+              );
+              setCityAwake(0.6);
+              return;
+            }
+
+            const dist = Math.abs(slot - stop);
+            // Keep settle progress stable near each snap; ease orbit only while moving
+            const buildingProgress =
+              dist < 0.1
+                ? 0.62
+                : clamp01(0.42 + dist * 0.28);
 
             setSceneMode("estate");
-            setActiveDevelopment(developments[idx].anchor as AnchorName);
-            setEstateBuildingProgress(local);
-            setCityAwake(0.55 + local * 0.2);
+            setActiveDevelopment(tour[stop].anchor as AnchorName);
+            setEstateBuildingProgress(buildingProgress);
+            setCityAwake(0.6);
           },
           onLeave: () => {
             setSceneMode("quiet");
@@ -160,10 +230,11 @@ export function useScrollStory(enabled: boolean) {
       );
     }
 
-    watch("section-problem", "problem", (p) => {
+    watch("section-problem", "problem", () => {
       setSceneMode("quiet");
       setAttentionMode("editorial");
-      setCityAwake(0.4 + p * 0.2);
+      setActiveDevelopment(null);
+      setCityAwake(0.45);
     }, { editorial: true });
 
     watch("section-resident", "resident", () => {
@@ -189,7 +260,6 @@ export function useScrollStory(enabled: boolean) {
       setAttentionMode("editorial");
     }, { editorial: true });
 
-    // DHS after results (locked order)
     watch("section-dhs-early", "dhs-early", (p) => {
       setSceneMode("dhs");
       setAttentionMode(p < 0.2 ? "cinematic" : "editorial");
@@ -249,6 +319,8 @@ export function useScrollStory(enabled: boolean) {
         setSection("cover", 0);
         setSceneMode("cover");
         setCoverReveal(0);
+        setActiveDevelopment(null);
+        setEstateBuildingProgress(0);
         setAttentionMode("cinematic");
       }
     });

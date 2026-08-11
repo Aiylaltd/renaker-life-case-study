@@ -6,6 +6,7 @@ import { SceneManager } from "@/scene/SceneManager";
 import { useQualityProfile } from "@/hooks/useQualityProfile";
 import { useDebug3d } from "@/hooks/useDebug3d";
 import { cameraDefaults } from "@/config/scene";
+import { useScrollStore } from "@/store/scrollStore";
 
 class CanvasErrorBoundary extends Component<
   { children: ReactNode; onError: (msg: string) => void },
@@ -29,8 +30,9 @@ class CanvasErrorBoundary extends Component<
 }
 
 export function SceneCanvas() {
-  const { settings, reduced } = useQualityProfile();
+  useQualityProfile();
   const debug = useDebug3d();
+  const experienceStarted = useScrollStore((s) => s.experienceStarted);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -47,13 +49,15 @@ export function SceneCanvas() {
       <div className="scene-canvas" aria-hidden>
         <CanvasErrorBoundary onError={setError}>
           <Canvas
-            dpr={settings.dpr}
+            dpr={1}
             gl={{
-              antialias: !reduced,
+              antialias: false,
               powerPreference: "high-performance",
               alpha: false,
+              stencil: false,
+              depth: true,
               failIfMajorPerformanceCaveat: false,
-              preserveDrawingBuffer: true,
+              preserveDrawingBuffer: false,
             }}
             camera={{
               fov: cameraDefaults.fov,
@@ -61,14 +65,12 @@ export function SceneCanvas() {
               far: cameraDefaults.far,
               position: cameraDefaults.overview.position,
             }}
-            frameloop="always"
+            // Freeze the render loop during the HTML prologue — biggest win.
+            frameloop={experienceStarted ? "always" : "never"}
             style={{ width: "100%", height: "100%", display: "block" }}
             onCreated={({ gl }) => {
-              gl.setClearColor("#c4bdb0", 1);
-              console.info(
-                "[SceneCanvas] WebGL ready",
-                gl.getContext().getParameter(gl.getContext().VERSION),
-              );
+              gl.setClearColor("#050506", 1);
+              gl.shadowMap.enabled = false;
             }}
           >
             <SceneManager debug={debug} />

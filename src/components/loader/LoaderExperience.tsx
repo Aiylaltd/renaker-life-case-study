@@ -8,6 +8,7 @@ import {
   loaderHumourIndices,
   loaderMessages,
 } from "@/config/caseStudy";
+import { RenakerLifeLogo } from "@/components/ui/RenakerLifeLogo";
 import { useScrollStore } from "@/store/scrollStore";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
@@ -91,10 +92,11 @@ export function LoaderExperience() {
 
   const humorous = loaderHumourIndices.includes(msgIndex);
   const coverReveal = useScrollStore((s) => s.coverReveal);
-  // Stay on screen through the dark cover; dissolve during reveal scroll
+  // Stay on screen through the dark cover; dissolve during reveal scroll.
+  // Reappears when scrolling back to the start (coverReveal drops again).
   const veilOpacity = Math.max(0, 1 - coverReveal * 1.35);
   const copyOpacity = Math.max(0, 1 - coverReveal * 1.8);
-  const dismissed = phase === "done" && coverReveal > 0.85;
+  const dismissed = phase === "done" && coverReveal > 0.82;
 
   return (
     <div
@@ -110,14 +112,22 @@ export function LoaderExperience() {
         style={{ opacity: veilOpacity }}
       />
       <div
+        className="loader-cover-grid grid-lines"
+        aria-hidden
+        style={{ opacity: veilOpacity * 0.22 }}
+      />
+      <div
         className="container-narrow relative z-[1] px-6 text-center"
         style={{ opacity: copyOpacity }}
       >
         <p className="text-label tracking-[0.22em] text-stone/55">
           {cover.eyebrow}
         </p>
-        <h1 className="mt-5 text-display text-stone">{cover.title}</h1>
-        <p className="mx-auto mt-6 max-w-xl text-subhead text-stone/70">
+        <h1 className="mx-auto mt-8 max-w-[min(92vw,34rem)]">
+          <RenakerLifeLogo variant="light" priority className="mx-auto" />
+          <span className="sr-only">{cover.title}</span>
+        </h1>
+        <p className="mx-auto mt-8 max-w-xl text-subhead text-stone/70">
           {cover.supporting}
         </p>
         <p className="mt-4 text-sm tracking-wide text-stone/45">

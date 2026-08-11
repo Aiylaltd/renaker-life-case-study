@@ -30,7 +30,7 @@ export function LiveStatusCard({
 
   return (
     <aside
-      className={`live-status glass-panel ${
+      className={`live-status glass-panel glass-panel-light ${
         visible ? "live-status--in" : "live-status--out"
       }`}
       aria-hidden={!visible}

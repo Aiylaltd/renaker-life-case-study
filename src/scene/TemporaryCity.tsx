@@ -57,11 +57,9 @@ function RenakerTowers({ active }: { active: string | null }) {
             <mesh position={[0, dev.tempHeight / 2, 0]}>
               <boxGeometry args={[3.2, dev.tempHeight, 3.2]} />
               <meshStandardMaterial
-                color={dev.tempColor}
+                color={isActive ? "#ebe4da" : dev.tempColor}
                 roughness={0.55}
                 metalness={0.15}
-                emissive={isActive ? "#c4b8a8" : "#000000"}
-                emissiveIntensity={isActive ? 0.18 : 0}
               />
             </mesh>
             <mesh position={[0, dev.tempHeight + 0.3, 0]}>

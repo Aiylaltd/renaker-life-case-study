@@ -12,6 +12,9 @@ export const brand = {
   poweredBy: "Aiyla",
   positioning: "The AI Operating System for Buildings",
   oneLiner: "One intelligent platform",
+  logos: {
+    light: "/images/brand/renaker-life-logo-Light.png",
+  },
 };
 
 export const loaderMessages = [

@@ -13,7 +13,7 @@ export function DevelopmentProfile({
 }) {
   return (
     <article
-      className={`dev-profile glass-panel overflow-hidden ${
+      className={`dev-profile glass-panel glass-panel-light overflow-hidden ${
         visible ? "dev-profile--in" : "dev-profile--out"
       } ${side === "right" ? "ml-auto" : ""}`}
       aria-hidden={!visible}

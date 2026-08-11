@@ -1,7 +1,9 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
-import { Environment, useGLTF } from "@react-three/drei";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import * as THREE from "three";
+import { useGLTF } from "@react-three/drei";
 import { TemporaryCity } from "@/scene/TemporaryCity";
 import { CameraDirector } from "@/scene/CameraDirector";
 import { ManchesterModel } from "@/scene/ManchesterModel";
@@ -20,110 +22,165 @@ if (typeof window !== "undefined") {
   useGLTF.setDecoderPath("/draco/");
 }
 
-function Atmosphere() {
-  const haze = useScrollStore((s) => s.haze);
-  const cityAwake = useScrollStore((s) => s.cityAwake);
-  const coverReveal = useScrollStore((s) => s.coverReveal);
+const BG_DARK = new THREE.Color("#050506");
+const BG_LIGHT = new THREE.Color("#b9b1a3");
+const GROUND_DARK = new THREE.Color("#08080a");
+const GROUND_LIGHT = new THREE.Color("#d6cfc3");
+const _bg = new THREE.Color();
+const _ground = new THREE.Color();
 
-  // Dark cover → warm architectural Manchester
-  const bgDark = "#0c0c0e";
-  const bgLight = "#b9b1a3";
-  const groundDark = "#121214";
-  const groundLight = "#d6cfc3";
-  const t = coverReveal;
-  const bg = lerpHex(bgDark, bgLight, t);
-  const ground = lerpHex(groundDark, groundLight, t);
+/**
+ * Imperative atmosphere — cover scroll updates lights/fog without React re-renders.
+ */
+function Atmosphere() {
+  const { scene, gl } = useThree();
+  const ambientRef = useRef<THREE.AmbientLight>(null);
+  const hemiRef = useRef<THREE.HemisphereLight>(null);
+  const keyRef = useRef<THREE.DirectionalLight>(null);
+  const fillRef = useRef<THREE.DirectionalLight>(null);
+  const groundMat = useRef<THREE.MeshLambertMaterial>(null);
+  const lastT = useRef(-1);
+
+  useFrame(() => {
+    const t = useScrollStore.getState().coverReveal;
+    const cityAwake = useScrollStore.getState().cityAwake;
+    if (Math.abs(t - lastT.current) < 0.002 && Math.abs(t - 1) > 0.01) return;
+    lastT.current = t;
+
+    _bg.copy(BG_DARK).lerp(BG_LIGHT, t);
+    _ground.copy(GROUND_DARK).lerp(GROUND_LIGHT, t);
+    scene.background = _bg;
+    gl.setClearColor(_bg, 1);
+
+    if (scene.fog instanceof THREE.Fog) {
+      scene.fog.color.copy(_bg);
+      scene.fog.near = 280 + t * 620;
+      scene.fog.far = 1400 + t * 2400;
+    }
+
+    if (ambientRef.current) {
+      ambientRef.current.intensity = 0.08 + t * 0.52 + cityAwake * 0.08;
+    }
+    if (hemiRef.current) {
+      hemiRef.current.intensity = 0.12 + t * 0.55;
+      hemiRef.current.groundColor.set(t > 0.4 ? "#8a8378" : "#0e0e12");
+    }
+    if (keyRef.current) keyRef.current.intensity = 0.08 + t * 1.1;
+    if (fillRef.current) fillRef.current.intensity = 0.04 + t * 0.35;
+    if (groundMat.current) groundMat.current.color.copy(_ground);
+  });
 
   return (
     <>
-      <color attach="background" args={[bg]} />
-      <fog attach="fog" args={[bg, 500 + t * 400, 2200 + t * 1600]} />
-      <ambientLight intensity={0.12 + t * 0.5 + cityAwake * 0.1} />
+      <fog attach="fog" args={["#050506", 280, 1400]} />
+      <ambientLight ref={ambientRef} intensity={0.08} />
       <hemisphereLight
-        args={["#f7f2ea", t > 0.4 ? "#8a8378" : "#1a1a1e", 0.25 + t * 0.5]}
+        ref={hemiRef}
+        args={["#f7f2ea", "#0e0e12", 0.12]}
       />
       <directionalLight
+        ref={keyRef}
         position={[600, 900, 400]}
-        intensity={0.15 + t * 1.25}
+        intensity={0.08}
         color="#fff8f0"
       />
       <directionalLight
+        ref={fillRef}
         position={[-400, 300, -200]}
-        intensity={0.08 + t * 0.4}
+        intensity={0.04}
         color="#d8dde8"
       />
-      {/* Sparse warm window lights during dark cover */}
-      <pointLight
-        position={[-160, 80, 740]}
-        intensity={(1 - t) * 2.2}
-        distance={280}
-        color="#C45C26"
-      />
-      <pointLight
-        position={[-390, 70, 860]}
-        intensity={(1 - t) * 1.6}
-        distance={220}
-        color="#e8c4a0"
-      />
-      <pointLight
-        position={[-850, 60, 380]}
-        intensity={(1 - t) * 1.4}
-        distance={240}
-        color="#C45C26"
-      />
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -2, 0]}
-        receiveShadow
-      >
-        <circleGeometry args={[1800, 64]} />
-        <meshStandardMaterial color={ground} roughness={1} metalness={0} />
-      </mesh>
-      {/* Mist veil during reveal */}
-      <mesh position={[0, 120, 0]} visible={t > 0.05 && t < 0.95}>
-        <sphereGeometry args={[900, 24, 24]} />
-        <meshBasicMaterial
-          color="#d8d2c6"
-          transparent
-          opacity={(1 - Math.abs(t - 0.5) * 2) * 0.22}
-          side={2}
-          depthWrite={false}
-        />
-      </mesh>
-      <mesh position={[0, 200, 0]} visible={haze > 0.15}>
-        <sphereGeometry args={[1400, 24, 24]} />
-        <meshBasicMaterial
-          color="#f1f0e8"
-          transparent
-          opacity={haze * 0.45}
-          side={2}
-          depthWrite={false}
-        />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
+        <circleGeometry args={[1800, 32]} />
+        <meshLambertMaterial ref={groundMat} color="#08080a" />
       </mesh>
     </>
   );
 }
 
-function lerpHex(a: string, b: string, t: number) {
-  const pa = parseInt(a.slice(1), 16);
-  const pb = parseInt(b.slice(1), 16);
-  const ar = (pa >> 16) & 255;
-  const ag = (pa >> 8) & 255;
-  const ab = pa & 255;
-  const br = (pb >> 16) & 255;
-  const bg = (pb >> 8) & 255;
-  const bb = pb & 255;
-  const r = Math.round(ar + (br - ar) * t);
-  const g = Math.round(ag + (bg - ag) * t);
-  const bl = Math.round(ab + (bb - ab) * t);
-  return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
+function DeferredTowers() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Mount towers only once the prologue hands off — preload still happens via useGLTF.preload.
+    const shouldLoad = (s: {
+      experienceStarted: boolean;
+      coverReveal: number;
+      sceneMode: string;
+    }) =>
+      s.experienceStarted ||
+      s.coverReveal > 0.2 ||
+      s.sceneMode === "estate" ||
+      s.sceneMode === "approach";
+
+    const unsub = useScrollStore.subscribe((s) => {
+      if (shouldLoad(s)) setReady(true);
+    });
+    if (shouldLoad(useScrollStore.getState())) setReady(true);
+    return () => unsub();
+  }, []);
+
+  if (!ready) return null;
+
+  return (
+    <ModelErrorBoundary name="renaker-towers">
+      <Suspense fallback={null}>
+        <RenakerModels />
+      </Suspense>
+    </ModelErrorBoundary>
+  );
+}
+
+function DeferredOverlays({
+  maxDhsPaths,
+  maxTrsrePins,
+}: {
+  maxDhsPaths: number;
+  maxTrsrePins: number;
+}) {
+  const [layer, setLayer] = useState<"none" | "dhs" | "doorly" | "trsre" | "finale">(
+    "none",
+  );
+
+  useEffect(() => {
+    const rank = { none: 0, dhs: 1, doorly: 2, trsre: 3, finale: 4 } as const;
+    return useScrollStore.subscribe((s) => {
+      let next: typeof layer = "none";
+      if (s.sceneMode === "finale" || s.orbReveal > 0.05) next = "finale";
+      else if (s.sceneMode === "trsre" || s.trsreIntensity > 0.05) next = "trsre";
+      else if (s.sceneMode === "doorly" || s.doorlyIntensity > 0.05) next = "doorly";
+      else if (s.sceneMode === "dhs" || s.dhsIntensity > 0.05) next = "dhs";
+      setLayer((prev) => (rank[next] >= rank[prev] ? next : prev));
+    });
+  }, []);
+
+  if (layer === "none") return null;
+
+  return (
+    <>
+      {(layer === "dhs" || layer === "doorly" || layer === "trsre" || layer === "finale") && (
+        <DigitalHighStreetPaths maxPaths={maxDhsPaths} />
+      )}
+      {(layer === "doorly" || layer === "trsre" || layer === "finale") && <DoorlyRoutes />}
+      {(layer === "trsre" || layer === "finale") && (
+        <>
+          <TRSREMarkers maxPins={maxTrsrePins} />
+          <TRSRERoutes />
+        </>
+      )}
+      {layer === "finale" && (
+        <Suspense fallback={null}>
+          <FinaleOrb />
+        </Suspense>
+      )}
+    </>
+  );
 }
 
 function RealCityWorld() {
   const modelLoadingState = useScrollStore((s) => s.modelLoadingState);
   const setModelLoadingState = useScrollStore((s) => s.setModelLoadingState);
-  const showProceduralFallback =
-    modelLoadingState !== "ready";
+  const showProceduralFallback = modelLoadingState !== "ready";
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -140,7 +197,6 @@ function RealCityWorld() {
 
   return (
     <>
-      {/* Soft procedural city while Manchester streams — no fake Renaker towers */}
       {showProceduralFallback && (
         <TemporaryCity density={0.45} hideTowers />
       )}
@@ -151,11 +207,7 @@ function RealCityWorld() {
         </Suspense>
       </ModelErrorBoundary>
 
-      <ModelErrorBoundary name="renaker-towers">
-        <Suspense fallback={null}>
-          <RenakerModels />
-        </Suspense>
-      </ModelErrorBoundary>
+      <DeferredTowers />
 
       {!showProceduralFallback && (
         <TemporaryCity density={0} markersOnly />
@@ -189,14 +241,10 @@ export function SceneManager({ debug = false }: { debug?: boolean }) {
         <TemporaryCity density={settings.cityDensity} />
       )}
 
-      <DigitalHighStreetPaths maxPaths={settings.maxDhsPaths} />
-      <DoorlyRoutes />
-      <TRSREMarkers maxPins={settings.maxTrsrePins} />
-      <TRSRERoutes />
-      <Suspense fallback={null}>
-        <FinaleOrb />
-      </Suspense>
-      <Environment preset="city" environmentIntensity={0.35} />
+      <DeferredOverlays
+        maxDhsPaths={settings.maxDhsPaths}
+        maxTrsrePins={settings.maxTrsrePins}
+      />
       {debug && <DebugAnchors />}
     </>
   );

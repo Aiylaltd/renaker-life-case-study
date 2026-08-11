@@ -8,6 +8,7 @@ export type SceneMode =
   | "loading"
   | "cover"
   | "reveal"
+  | "approach"
   | "overview"
   | "estate"
   | "estate-overview"
@@ -40,6 +41,12 @@ interface ScrollState {
   haze: number;
   orbReveal: number;
   loaderDone: boolean;
+  /** Prologue finished — unlocks existing V1 scroll/camera story */
+  experienceStarted: boolean;
+  /** Auto-scroll into the first city view after Start — blocks user scroll */
+  demoIntroLock: boolean;
+  /** Post-intro prompt: scroll to continue the estate tour */
+  scrollCueVisible: boolean;
   modelLoadingState: "idle" | "loading" | "ready" | "fallback";
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
@@ -59,6 +66,9 @@ interface ScrollState {
   setHaze: (v: number) => void;
   setOrbReveal: (v: number) => void;
   setLoaderDone: (v: boolean) => void;
+  setExperienceStarted: (v: boolean) => void;
+  setDemoIntroLock: (v: boolean) => void;
+  setScrollCueVisible: (v: boolean) => void;
   setModelLoadingState: (s: ScrollState["modelLoadingState"]) => void;
   setCameraDebug: (
     position: [number, number, number],
@@ -84,6 +94,9 @@ export const useScrollStore = create<ScrollState>((set) => ({
   haze: 0,
   orbReveal: 0,
   loaderDone: false,
+  experienceStarted: false,
+  demoIntroLock: false,
+  scrollCueVisible: false,
   modelLoadingState: "fallback",
   cameraPosition: [80, 520, 780],
   cameraTarget: [0, 40, 0],
@@ -105,6 +118,9 @@ export const useScrollStore = create<ScrollState>((set) => ({
   setHaze: (haze) => set({ haze }),
   setOrbReveal: (orbReveal) => set({ orbReveal }),
   setLoaderDone: (loaderDone) => set({ loaderDone }),
+  setExperienceStarted: (experienceStarted) => set({ experienceStarted }),
+  setDemoIntroLock: (demoIntroLock) => set({ demoIntroLock }),
+  setScrollCueVisible: (scrollCueVisible) => set({ scrollCueVisible }),
   setModelLoadingState: (modelLoadingState) => set({ modelLoadingState }),
   setCameraDebug: (cameraPosition, cameraTarget) =>
     set({ cameraPosition, cameraTarget }),

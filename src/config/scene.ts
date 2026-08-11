@@ -43,7 +43,8 @@ export const ALL_ANCHORS: AnchorName[] = [
 
 /** Configurable asset paths — update filenames here when finals land. */
 export const sceneAssets = {
-  manchester: "/models/manchester.glb",
+  /** Manchester (1).glb — correct ANCHOR_* empties including ANCHOR_BLADE/360 */
+  manchester: "/models/manchester.glb?v=manchester1",
   renaker: {
     ANCHOR_DGS: "/models/renaker/dgs.glb",
     // Blade + Three60 ship as one combined GLB for now
@@ -92,6 +93,10 @@ export const renakerModelEntries: {
   anchors: AnchorName[];
   /** Place at this anchor (combined models use one placement) */
   placeAt: AnchorName;
+  /** Object names to hide (oversized site pads, leftovers, etc.) */
+  hideObjectNames?: string[];
+  /** Material names to strip (site pads that spill past the tower) */
+  hideMaterialNames?: string[];
 }[] = [
   {
     id: "dgs",
@@ -113,9 +118,12 @@ export const renakerModelEntries: {
   },
   {
     id: "crownst",
-    path: "/models/renaker/crownst.glb",
+    path: "/models/renaker/crownst.glb?v=nopad2",
     anchors: ["ANCHOR_CROWNST"],
     placeAt: "ANCHOR_CROWNST",
+    // Oversized dark site pads that spill past the tower footprint
+    hideObjectNames: ["Plane.077", "Plane.078"],
+    hideMaterialNames: ["Scan Street dirt tiles"],
   },
   {
     id: "bankside",
@@ -135,26 +143,26 @@ export type QualityProfile = "desktop" | "mobile" | "reduced";
 
 export const qualityProfiles = {
   desktop: {
-    dpr: [1, 1.5] as [number, number],
+    dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 40,
-    maxDhsPaths: 6,
+    maxTrsrePins: 24,
+    maxDhsPaths: 4,
     postprocessing: false,
     cityDensity: 1,
   },
   mobile: {
-    dpr: [1, 1.25] as [number, number],
+    dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 22,
-    maxDhsPaths: 3,
+    maxTrsrePins: 14,
+    maxDhsPaths: 2,
     postprocessing: false,
     cityDensity: 0.55,
   },
   reduced: {
-    dpr: [1, 1] as [number, number],
+    dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 12,
-    maxDhsPaths: 2,
+    maxTrsrePins: 8,
+    maxDhsPaths: 1,
     postprocessing: false,
     cityDensity: 0.4,
   },

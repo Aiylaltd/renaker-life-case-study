@@ -1,6 +1,8 @@
 "use client";
 
-import { LoaderExperience } from "@/components/loader/LoaderExperience";
+import { PrologueExperience } from "@/components/prologue/PrologueExperience";
+import { CoverVeil } from "@/components/cover/CoverVeil";
+import { DemoScrollCue } from "@/components/cover/DemoScrollCue";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { CoverSection } from "@/components/sections/CoverSection";
 import { HeroSection } from "@/components/sections/HeroSection";
@@ -19,11 +21,13 @@ import { FinaleSection } from "@/components/sections/FinaleSection";
 import { useScrollStory } from "@/hooks/useScrollStory";
 import { useScrollStore } from "@/store/scrollStore";
 import { brand } from "@/config/caseStudy";
+import { RenakerLifeLogo } from "@/components/ui/RenakerLifeLogo";
 import { SceneCanvas } from "@/scene/SceneCanvas";
 
 export function CaseStudyPage() {
-  const loaderDone = useScrollStore((s) => s.loaderDone);
-  useScrollStory(loaderDone);
+  const experienceStarted = useScrollStore((s) => s.experienceStarted);
+  // Gate the existing V1 story until the prologue hands off.
+  useScrollStory(experienceStarted);
 
   return (
     <>
@@ -33,22 +37,29 @@ export function CaseStudyPage() {
 
       <SceneCanvas />
 
-      <LoaderExperience />
+      <PrologueExperience />
+      <CoverVeil />
+      <DemoScrollCue />
       <DebugOverlay />
 
-      <main id="story" className="story-layer">
+      <main
+        id="story"
+        className="story-layer"
+        aria-hidden={!experienceStarted}
+        {...(!experienceStarted ? { inert: true } : {})}
+      >
         <header className="pointer-events-none fixed left-0 right-0 top-0 z-20 px-5 py-5 md:px-8">
-          <div className="container-wide flex items-center justify-between">
-            <p className="text-label tracking-[0.16em] text-ink/70 mix-blend-difference">
-              {brand.product}
-            </p>
+          <div className="container-wide flex items-center justify-between gap-6">
+            <div className="w-[min(42vw,11.5rem)] mix-blend-difference">
+              <RenakerLifeLogo variant="light" />
+            </div>
             <p className="text-xs text-ink/45 mix-blend-difference">
               Case study · powered by {brand.poweredBy}
             </p>
           </div>
         </header>
 
-        {/* Locked V2 order */}
+        {/* Existing V1 order — unchanged */}
         <CoverSection />
         <HeroSection />
         <ProblemSection />

@@ -1,29 +1,42 @@
 "use client";
 
 import { sections } from "@/config/caseStudy";
-import { developments } from "@/config/developments";
+import { estateTourDevelopments } from "@/config/developments";
 import { DevelopmentProfile } from "@/components/ui/DevelopmentProfile";
 import { LiveStatusCard } from "@/components/ui/LiveStatusCard";
 import { useScrollStore } from "@/store/scrollStore";
+
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
 
 export function HeroSection() {
   const active = useScrollStore((s) => s.activeDevelopment);
   const sceneMode = useScrollStore((s) => s.sceneMode);
   const sectionId = useScrollStore((s) => s.sectionId);
-  const progress = useScrollStore((s) =>
-    s.sectionId === "hero" ? s.sectionProgress : s.sectionId === "cover" ? 0 : 1,
+  const coverReveal = useScrollStore((s) => s.coverReveal);
+  const heroProgress = useScrollStore((s) =>
+    s.sectionId === "hero" ? s.sectionProgress : 0,
   );
 
-  const showIntro = sectionId === "hero" && progress < 0.06;
+  const tourStops = estateTourDevelopments.length + 1;
+  const overviewThreshold = (tourStops - 1.15) / (tourStops - 1);
+
+  // Entry headline only on the cover runway — clears before the first tower card.
+  const entryOpacity =
+    sectionId === "cover" ? clamp01((coverReveal - 0.22) / 0.28) : 0;
+  const showEntry = entryOpacity > 0.02;
+
   const showOverview =
     sceneMode === "estate-overview" ||
-    (sectionId === "hero" && progress > 0.92);
-  const activeDev = developments.find((d) => d.anchor === active);
+    (sectionId === "hero" && heroProgress > overviewThreshold);
+  const activeDev = estateTourDevelopments.find((d) => d.anchor === active);
+  // First snap sits at heroProgress 0 — don't gate cards on a mid-section threshold.
   const showCards =
-    sceneMode === "estate" &&
+    (sceneMode === "estate" || sceneMode === "approach") &&
     !!activeDev &&
-    progress > 0.06 &&
-    progress < 0.92;
+    sectionId === "hero" &&
+    !showOverview;
 
   return (
     <section
@@ -31,30 +44,37 @@ export function HeroSection() {
       className="story-section--estate relative"
       aria-labelledby="hero-heading"
     >
+      <div
+        className={`pointer-events-none fixed inset-0 z-[15] flex items-end pb-[12vh] md:items-center md:pb-0 transition-opacity duration-500 ${
+          showEntry ? "" : "invisible"
+        }`}
+        style={{ opacity: entryOpacity }}
+        aria-hidden={!showEntry}
+      >
+        <div className="container-wide w-full">
+          <p className="text-label text-muted-dark">Renaker Life</p>
+          <h1
+            id="hero-heading"
+            className="mt-4 max-w-3xl whitespace-pre-line text-display editorial-type"
+          >
+            {sections.hero.headline}
+          </h1>
+          <p className="mt-5 max-w-xl text-subhead text-ink/70">
+            {sections.hero.supporting}
+          </p>
+        </div>
+      </div>
+
       <div className="sticky top-0 flex min-h-[100svh] items-center">
         <div className="container-wide grid w-full gap-6 lg:grid-cols-[1fr_minmax(280px,360px)] lg:items-end">
           <div
             className={`transition-opacity duration-700 ${
-              showIntro || showOverview
+              showOverview && !showEntry
                 ? "opacity-100"
                 : "pointer-events-none opacity-0"
             }`}
           >
-            {showIntro && (
-              <>
-                <p className="text-label text-muted-dark">Renaker Life</p>
-                <h1
-                  id="hero-heading"
-                  className="mt-4 max-w-3xl whitespace-pre-line text-display editorial-type"
-                >
-                  {sections.hero.headline}
-                </h1>
-                <p className="mt-5 max-w-xl text-subhead text-ink/70">
-                  {sections.hero.supporting}
-                </p>
-              </>
-            )}
-            {showOverview && !showIntro && (
+            {showOverview && !showEntry && (
               <h2 className="max-w-3xl text-display editorial-type">
                 {sections.hero.overviewLine}
               </h2>
@@ -66,7 +86,7 @@ export function HeroSection() {
               showCards ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
           >
-            {developments.map((dev) => {
+            {estateTourDevelopments.map((dev) => {
               const on = active === dev.anchor && showCards;
               return (
                 <div

@@ -52,7 +52,7 @@ const defaultPlacement = (): DevelopmentPlacement => ({
 });
 
 /**
- * Seven-development estate tour.
+ * All Renaker developments (models stay on the map).
  * Camera + live feeds are art-directed per building.
  */
 export const developments: Development[] = [
@@ -68,11 +68,12 @@ export const developments: Development[] = [
     imageAlt: "Deansgate Square residential towers in Manchester",
     tempHeight: 28,
     tempColor: "#3a3a3e",
-    placement: defaultPlacement(),
+    // ~10% smaller; nudge toward the roadside (opposite of prior offset)
+    placement: { offset: [-14, 0, 8], yawDeg: 90, scale: 0.9 },
     camera: {
       arrivalOffset: [180, 140, 240],
-      orbitStartDeg: -12,
-      orbitEndDeg: 28,
+      orbitStartDeg: -4,
+      orbitEndDeg: 10,
       targetOffset: [0, 95, 0],
       fov: 40,
       overlaySide: "left",
@@ -107,11 +108,11 @@ export const developments: Development[] = [
     imageAlt: "Three60 residential tower in Manchester",
     tempHeight: 22,
     tempColor: "#4a4550",
-    placement: defaultPlacement(),
+    placement: { offset: [0, 0, 0], yawDeg: 90, scale: 1 },
     camera: {
       arrivalOffset: [150, 155, 200],
-      orbitStartDeg: -8,
-      orbitEndDeg: 32,
+      orbitStartDeg: -3,
+      orbitEndDeg: 10,
       targetOffset: [0, 100, 0],
       fov: 38,
       overlaySide: "right",
@@ -146,14 +147,16 @@ export const developments: Development[] = [
     imageAlt: "The Blade residential tower in Manchester",
     tempHeight: 24,
     tempColor: "#2f3438",
-    placement: defaultPlacement(),
+    // Combined Blade/Three60 GLB — placeAt uses ANCHOR_BLADE
+    placement: { offset: [0, 0, 0], yawDeg: 90, scale: 1 },
     camera: {
-      arrivalOffset: [130, 150, 210],
-      orbitStartDeg: -18,
-      orbitEndDeg: 22,
-      targetOffset: [0, 92, 0],
-      fov: 39,
-      overlaySide: "left",
+      // Wide New Jackson frame; light settle orbit
+      arrivalOffset: [210, 170, 280],
+      orbitStartDeg: -6,
+      orbitEndDeg: 10,
+      targetOffset: [0, 100, 0],
+      fov: 42,
+      overlaySide: "right",
     },
     liveFeed: [
       {
@@ -226,10 +229,11 @@ export const developments: Development[] = [
     tempColor: "#454048",
     placement: defaultPlacement(),
     camera: {
-      arrivalOffset: [170, 135, 230],
-      orbitStartDeg: -10,
-      orbitEndDeg: 40,
-      targetOffset: [0, 85, 0],
+      // Far side of Crown — clear of Blade / DGS in the foreground
+      arrivalOffset: [-210, 155, -230],
+      orbitStartDeg: 22,
+      orbitEndDeg: 36,
+      targetOffset: [0, 95, 0],
       fov: 40,
       overlaySide: "left",
     },
@@ -302,14 +306,15 @@ export const developments: Development[] = [
     imageAlt: "Castle Wharf beside Castlefield canal basin",
     tempHeight: 14,
     tempColor: "#41464c",
-    placement: defaultPlacement(),
+    placement: { offset: [0, 0, 0], yawDeg: 5, scale: 1 },
     camera: {
-      arrivalOffset: [140, 120, 200],
-      orbitStartDeg: -14,
-      orbitEndDeg: 26,
-      targetOffset: [0, 70, 0],
-      fov: 42,
-      overlaySide: "left",
+      // South approach so Crown / DGS stay out of the lens
+      arrivalOffset: [50, 125, -250],
+      orbitStartDeg: -2,
+      orbitEndDeg: 12,
+      targetOffset: [0, 75, 0],
+      fov: 41,
+      overlaySide: "right",
     },
     liveFeed: [
       {
@@ -331,6 +336,43 @@ export const developments: Development[] = [
   },
 ];
 
+function requireDev(id: string): Development {
+  const dev = developments.find((d) => d.id === id);
+  if (!dev) throw new Error(`Missing development "${id}"`);
+  return dev;
+}
+
+/**
+ * Estate camera tour stops.
+ * Blade + Three60 share one stop; VRG / Bankside omitted (too far).
+ */
+export const estateTourDevelopments: Development[] = (() => {
+  const dgs = requireDev("deansgate-square");
+  const three60 = requireDev("three60");
+  const blade = requireDev("the-blade");
+  const crown = requireDev("crown-street");
+  const cw = requireDev("castle-wharf");
+
+  const bladeThree60: Development = {
+    ...blade,
+    id: "blade-three60",
+    name: "The Blade & Three60",
+    homes: "857 homes",
+    shortLine: "New Jackson — two landmarks, one connected experience.",
+    imageAlt: "The Blade and Three60 at New Jackson, Manchester",
+    liveFeed: [
+      three60.liveFeed[0],
+      blade.liveFeed[0],
+      three60.liveFeed[1],
+    ].filter(Boolean),
+  };
+
+  return [dgs, bladeThree60, crown, cw];
+})();
+
 export function getDevelopmentByAnchor(anchor: AnchorName) {
-  return developments.find((d) => d.anchor === anchor);
+  return (
+    estateTourDevelopments.find((d) => d.anchor === anchor) ??
+    developments.find((d) => d.anchor === anchor)
+  );
 }
