@@ -22,6 +22,10 @@
 .DS_Store
 *.pem
 
+# Heavy Blender source GLBs — not used at runtime (optimized copies live in renaker/)
+# Cloudflare Pages rejects assets over 25 MiB; source/crownst.glb is ~83 MiB.
+/public/models/renaker/source/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
