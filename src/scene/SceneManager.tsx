@@ -98,30 +98,11 @@ function Atmosphere() {
   );
 }
 
-function DeferredTowers() {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    // Mount towers only once the prologue hands off — preload still happens via useGLTF.preload.
-    const shouldLoad = (s: {
-      experienceStarted: boolean;
-      coverReveal: number;
-      sceneMode: string;
-    }) =>
-      s.experienceStarted ||
-      s.coverReveal > 0.2 ||
-      s.sceneMode === "estate" ||
-      s.sceneMode === "approach";
-
-    const unsub = useScrollStore.subscribe((s) => {
-      if (shouldLoad(s)) setReady(true);
-    });
-    if (shouldLoad(useScrollStore.getState())) setReady(true);
-    return () => unsub();
-  }, []);
-
-  if (!ready) return null;
-
+/**
+ * Towers mount during the HTML loading screen (canvas renders under the veil)
+ * so GPU upload / shader compile happens off-screen — not when Start is clicked.
+ */
+function EarlyTowers() {
   return (
     <ModelErrorBoundary name="renaker-towers">
       <Suspense fallback={null}>
@@ -207,7 +188,7 @@ function RealCityWorld() {
         </Suspense>
       </ModelErrorBoundary>
 
-      <DeferredTowers />
+      <EarlyTowers />
 
       {!showProceduralFallback && (
         <TemporaryCity density={0} markersOnly />

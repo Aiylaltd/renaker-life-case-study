@@ -488,6 +488,12 @@
 
   /* —— Prologue (HTML intro before existing V1 3D scroll) —— */
   .prologue {
+    /* Opening slides use Renaker yellow, not Aiyla orange */
+    --color-accent: #e2b93d;
+    --color-accent-muted: #c4a032;
+    --color-accent-light: rgba(226, 185, 61, 0.16);
+    --color-accent-dark: #a88a2a;
+    --color-renaker-yellow: #e2b93d;
     position: fixed;
     inset: 0;
     z-index: 60;
@@ -793,6 +799,64 @@
     color: rgba(245, 242, 237, 0.28);
   }
 
+  .prologue__scroll-meter {
+    position: fixed;
+    right: clamp(0.85rem, 2vw, 1.5rem);
+    top: 50%;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.65rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+    opacity: 0.45;
+    transition: opacity 0.35s var(--ease-premium);
+  }
+
+  .prologue__scroll-meter.is-active {
+    opacity: 1;
+  }
+
+  .prologue__scroll-meter__label {
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(245, 242, 237, 0.45);
+  }
+
+  .prologue__scroll-meter.is-active .prologue__scroll-meter__label {
+    color: rgba(245, 242, 237, 0.72);
+  }
+
+  .prologue__scroll-meter__track {
+    position: relative;
+    width: 2px;
+    height: min(28vh, 11.5rem);
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(245, 242, 237, 0.12);
+  }
+
+  .prologue__scroll-meter__fill {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 0;
+    border-radius: inherit;
+    background: #e2b93d;
+    box-shadow: 0 0 12px rgba(226, 185, 61, 0.35);
+    transition: height 0.08s linear;
+  }
+
+  .prologue__scroll-meter.is-back .prologue__scroll-meter__fill {
+    top: 0;
+    bottom: auto;
+    background: rgba(245, 242, 237, 0.55);
+    box-shadow: none;
+  }
+
   .prologue__box {
     border-radius: 30px;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -857,6 +921,40 @@
     justify-content: center;
   }
 
+  .prologue__box--finale {
+    min-height: min(56vh, 520px);
+  }
+
+  .prologue__finale {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: center;
+    width: 100%;
+  }
+
+  .prologue__brand-block--finale {
+    width: min(85vw, 26rem);
+  }
+
+  .prologue__powered {
+    margin: 1.1rem 0 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(226, 185, 61, 0.78);
+  }
+
+  .prologue__finale-cta .prologue__display {
+    max-width: 14ch;
+    font-size: clamp(1.55rem, 2.6vw, 2.35rem);
+    letter-spacing: -0.03em;
+  }
+
+  .prologue__finale-brand .prologue__support {
+    max-width: 28rem;
+  }
+
   .prologue__tags {
     display: flex;
     flex-wrap: wrap;
@@ -909,12 +1007,14 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(196, 92, 38, 0.85),
+      rgba(226, 185, 61, 0.85),
       transparent
     );
   }
 
   .prologue__cta {
+    position: relative;
+    isolation: isolate;
     border: 1px solid rgba(245, 242, 237, 0.22);
     background: rgba(245, 242, 237, 0.06);
     color: var(--color-stone);
@@ -925,6 +1025,7 @@
     text-transform: uppercase;
     font-weight: 500;
     cursor: pointer;
+    overflow: hidden;
     transition:
       background 0.35s var(--ease-premium),
       border-color 0.35s var(--ease-premium),
@@ -937,9 +1038,38 @@
   }
 
   .prologue__cta.is-active {
-    background: rgba(196, 92, 38, 0.22);
-    border-color: rgba(196, 92, 38, 0.65);
+    background: rgba(226, 185, 61, 0.22);
+    border-color: rgba(226, 185, 61, 0.65);
     transform: scale(0.98);
+  }
+
+  .prologue__cta--shine {
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: #101012;
+    box-shadow: none;
+    animation: prologue-cta-edge 2.4s ease-in-out infinite;
+  }
+
+  .prologue__cta--shine::before,
+  .prologue__cta--shine::after {
+    content: none !important;
+    display: none !important;
+  }
+
+  .prologue__cta--shine:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: #161618;
+  }
+
+  @keyframes prologue-cta-edge {
+    0%,
+    100% {
+      border-color: rgba(255, 255, 255, 0.22);
+    }
+    50% {
+      border-color: rgba(255, 255, 255, 0.55);
+    }
   }
 
   .prologue-photo {
@@ -1047,9 +1177,9 @@
     display: inline-flex;
     margin-top: 0.85rem;
     border-radius: 999px;
-    border: 1px solid rgba(196, 92, 38, 0.35);
-    background: rgba(196, 92, 38, 0.12);
-    color: #e8c4a8;
+    border: 1px solid rgba(226, 185, 61, 0.4);
+    background: rgba(226, 185, 61, 0.12);
+    color: #f2dc8c;
     padding: 0.22rem 0.55rem;
     font-size: 0.6rem;
     letter-spacing: 0.1em;
@@ -1064,7 +1194,7 @@
     border-radius: 0.85rem;
     background: linear-gradient(
       145deg,
-      rgba(196, 92, 38, 0.22),
+      rgba(226, 185, 61, 0.22),
       rgba(255, 255, 255, 0.05)
     );
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1111,8 +1241,8 @@
 
   .prologue-duo__row.is-ai,
   .prologue-duo__note.is-ai {
-    border-color: rgba(196, 92, 38, 0.3);
-    background: rgba(196, 92, 38, 0.1);
+    border-color: rgba(226, 185, 61, 0.35);
+    background: rgba(226, 185, 61, 0.12);
   }
 
   .prologue-duo__phone {
@@ -1232,7 +1362,7 @@
   }
 
   .prologue-ops__bars i.is-live {
-    background: rgba(196, 92, 38, 0.75);
+    background: rgba(226, 185, 61, 0.8);
   }
 
   .prologue-ops__chart-meta {
@@ -1317,8 +1447,8 @@
 
   .prologue-insight {
     border-radius: 1rem;
-    border: 1px solid rgba(196, 92, 38, 0.28);
-    background: rgba(196, 92, 38, 0.08);
+    border: 1px solid rgba(226, 185, 61, 0.32);
+    background: rgba(226, 185, 61, 0.1);
     padding: 1rem 1.1rem;
   }
 
@@ -1334,7 +1464,7 @@
     border-radius: 0.85rem;
     background: linear-gradient(
       145deg,
-      rgba(196, 92, 38, 0.35),
+      rgba(226, 185, 61, 0.4),
       rgba(255, 255, 255, 0.08)
     );
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1387,7 +1517,7 @@
     font-size: 0.65rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #c45c26;
+    color: #e2b93d;
     font-weight: 500;
   }
 
@@ -1416,8 +1546,8 @@
     z-index: 55;
     pointer-events: none;
     transition:
-      opacity 0.8s var(--ease-premium),
-      visibility 0.8s;
+      opacity 1.35s var(--ease-premium),
+      visibility 1.35s;
   }
 
   .cover-veil.is-done {
@@ -1478,9 +1608,26 @@
   }
 
   @media (max-width: 900px) {
+    .prologue__scroll-meter {
+      right: 0.65rem;
+    }
+
+    .prologue__scroll-meter__track {
+      height: min(22vh, 8.5rem);
+    }
+
     .prologue__ambition {
       grid-template-columns: 1fr;
       gap: 1rem;
+    }
+
+    .prologue__finale {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .prologue__finale-cta .prologue__display {
+      max-width: none;
     }
 
     .prologue__box--copy,

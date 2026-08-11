@@ -306,7 +306,7 @@ export const developments: Development[] = [
     imageAlt: "Castle Wharf beside Castlefield canal basin",
     tempHeight: 14,
     tempColor: "#41464c",
-    placement: { offset: [0, 0, 0], yawDeg: 5, scale: 1 },
+    placement: { offset: [0, 0, 0], yawDeg: 10, scale: 1 },
     camera: {
       // South approach so Crown / DGS stay out of the lens
       arrivalOffset: [50, 125, -250],

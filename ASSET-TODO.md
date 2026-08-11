@@ -36,7 +36,9 @@ Must exist as named nodes:
 
 ## Content review before publication
 
-- [ ] Exact metric wording (64% / 93% / 71% / 118%)
+- [ ] Exact metric wording lock (current set: 4,000+ / 71% in 78 days / 64% / 98% / 118%)
+- [ ] Confirm 98% adoption definition vs first-site 93% if both historically used
+- [ ] Confirm 118% operational-efficiency definition
 - [ ] Development display names still marked TODO in config
 - [ ] Business placeholder names → real Renaker Life Rewards partners
 - [ ] Quote attribution for TRSRE feedback line

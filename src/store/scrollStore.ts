@@ -47,6 +47,8 @@ interface ScrollState {
   demoIntroLock: boolean;
   /** Post-intro prompt: scroll to continue the estate tour */
   scrollCueVisible: boolean;
+  /** Bump to force CameraDirector to hard-cut to the current composition */
+  cameraSnapNonce: number;
   modelLoadingState: "idle" | "loading" | "ready" | "fallback";
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
@@ -69,6 +71,7 @@ interface ScrollState {
   setExperienceStarted: (v: boolean) => void;
   setDemoIntroLock: (v: boolean) => void;
   setScrollCueVisible: (v: boolean) => void;
+  requestCameraSnap: () => void;
   setModelLoadingState: (s: ScrollState["modelLoadingState"]) => void;
   setCameraDebug: (
     position: [number, number, number],
@@ -97,6 +100,7 @@ export const useScrollStore = create<ScrollState>((set) => ({
   experienceStarted: false,
   demoIntroLock: false,
   scrollCueVisible: false,
+  cameraSnapNonce: 0,
   modelLoadingState: "fallback",
   cameraPosition: [80, 520, 780],
   cameraTarget: [0, 40, 0],
@@ -121,6 +125,8 @@ export const useScrollStore = create<ScrollState>((set) => ({
   setExperienceStarted: (experienceStarted) => set({ experienceStarted }),
   setDemoIntroLock: (demoIntroLock) => set({ demoIntroLock }),
   setScrollCueVisible: (scrollCueVisible) => set({ scrollCueVisible }),
+  requestCameraSnap: () =>
+    set((s) => ({ cameraSnapNonce: s.cameraSnapNonce + 1 })),
   setModelLoadingState: (modelLoadingState) => set({ modelLoadingState }),
   setCameraDebug: (cameraPosition, cameraTarget) =>
     set({ cameraPosition, cameraTarget }),

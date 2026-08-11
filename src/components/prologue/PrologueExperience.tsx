@@ -28,14 +28,18 @@ gsap.registerPlugin(ScrollTrigger);
 
 type Stage = "loading" | "orientation" | "story" | "exiting" | "done";
 
-/** Ambitions + Aiyla + Start — all swap inside one fixed stage. */
-const STORY_STEPS = prologueAmbitions.length + 2;
+/** Ambitions + final Aiyla / Start panel — all swap inside one fixed stage. */
+const STORY_STEPS = prologueAmbitions.length + 1;
 const AIYLA_STEP = prologueAmbitions.length;
-const START_STEP = prologueAmbitions.length + 1;
+
+/** Wheel delta needed to fill the side meter and change slide. */
+const STEP_DELTA_THRESHOLD = 520;
+/** Key press fills this much of the meter (space / arrows). */
+const KEY_CHARGE = 0.42;
 
 /**
  * HTML/CSS prologue above the persistent V1 canvas.
- * Loading → orientation → ambitions → Aiyla → Start → existing cover scroll.
+ * Loading → orientation → ambitions → Aiyla/Start → existing cover scroll.
  */
 export function PrologueExperience() {
   const reduced = useReducedMotion();
@@ -54,12 +58,17 @@ export function PrologueExperience() {
   );
   const setDemoIntroLock = useScrollStore((s) => s.setDemoIntroLock);
   const setScrollCueVisible = useScrollStore((s) => s.setScrollCueVisible);
+  const setSection = useScrollStore((s) => s.setSection);
+  const setCityAwake = useScrollStore((s) => s.setCityAwake);
+  const requestCameraSnap = useScrollStore((s) => s.requestCameraSnap);
 
   const [stage, setStage] = useState<Stage>("loading");
   const [progress, setProgress] = useState(0);
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [step, setStep] = useState(0);
   const [starting, setStarting] = useState(false);
+  /** -1…1 scroll charge for the side meter (sign = direction). */
+  const [slideCharge, setSlideCharge] = useState(0);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -67,11 +76,26 @@ export function PrologueExperience() {
   const finishedLoad = useRef(false);
   const stepRef = useRef(0);
   const busyRef = useRef(false);
+  const chargeRef = useRef(0);
+  const chargeRaf = useRef(0);
   /** When set, story stage opens on this card instead of resetting to 0. */
   const entryStepRef = useRef<number | null>(null);
   const resumeFadeRef = useRef(false);
   const returningRef = useRef(false);
   const introTweenRef = useRef<gsap.core.Tween | null>(null);
+
+  const resetCharge = useCallback(() => {
+    chargeRef.current = 0;
+    setSlideCharge(0);
+  }, []);
+
+  const syncChargeUi = useCallback(() => {
+    if (chargeRaf.current) return;
+    chargeRaf.current = requestAnimationFrame(() => {
+      chargeRaf.current = 0;
+      setSlideCharge(Math.max(-1, Math.min(1, chargeRef.current)));
+    });
+  }, []);
 
   useEffect(() => {
     if (stage === "done" || stage === "exiting") return;
@@ -95,16 +119,30 @@ export function PrologueExperience() {
     };
   }, [stage]);
 
+  const assetsReadyRef = useRef(false);
+
   useEffect(() => {
-    try {
-      useGLTF.preload(sceneAssets.manchester);
-      const dgs = sceneAssets.renaker.ANCHOR_DGS;
-      const blade = sceneAssets.renaker.ANCHOR_BLADE;
-      if (dgs) useGLTF.preload(dgs);
-      if (blade) useGLTF.preload(blade);
-    } catch {
-      /* best-effort */
-    }
+    let cancelled = false;
+    const paths = [
+      sceneAssets.manchester,
+      ...new Set(
+        Object.values(sceneAssets.renaker).filter(Boolean) as string[],
+      ),
+    ];
+
+    Promise.all(
+      paths.map((url) =>
+        Promise.resolve(useGLTF.preload(url) as unknown as Promise<unknown>).catch(
+          () => null,
+        ),
+      ),
+    ).then(() => {
+      if (!cancelled) assetsReadyRef.current = true;
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -120,6 +158,7 @@ export function PrologueExperience() {
     }
 
     let raf = 0;
+    let settleTimer = 0;
     const start = performance.now();
     const minDuration = 3400;
     const hardTimeout = 14000;
@@ -128,8 +167,9 @@ export function PrologueExperience() {
       if (finishedLoad.current) return;
       const elapsed = now - start;
       const timeProgress = Math.min(1, elapsed / minDuration);
-      const ready =
+      const cityReady =
         modelRef.current === "ready" || modelRef.current === "fallback";
+      const ready = cityReady && assetsReadyRef.current;
 
       let p = Math.floor(timeProgress * (ready ? 100 : 88));
       if (ready && timeProgress >= 1) p = 100;
@@ -145,8 +185,12 @@ export function PrologueExperience() {
 
       if (p >= 100) {
         finishedLoad.current = true;
-        setLoaderDone(true);
-        window.setTimeout(() => setStage("orientation"), 450);
+        // Keep the canvas warming under the loading UI so towers finish GPU upload
+        // before we freeze the frameloop for the intro cards.
+        settleTimer = window.setTimeout(() => {
+          setLoaderDone(true);
+          setStage("orientation");
+        }, 700);
         return;
       }
 
@@ -154,28 +198,55 @@ export function PrologueExperience() {
     };
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(settleTimer);
+    };
   }, [reduced, setLoaderDone, stage]);
 
   useEffect(() => {
     if (stage !== "orientation") return;
-    const advance = () => setStage("story");
-    const onWheel = (e: WheelEvent) => {
-      if (e.deltaY > 8) advance();
+    chargeRef.current = 0;
+    setSlideCharge(0);
+
+    const advance = () => {
+      chargeRef.current = 0;
+      setSlideCharge(0);
+      setStage("story");
     };
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (e.deltaY <= 0) {
+        chargeRef.current = Math.max(0, chargeRef.current + e.deltaY / STEP_DELTA_THRESHOLD);
+        syncChargeUi();
+        return;
+      }
+      chargeRef.current += e.deltaY / STEP_DELTA_THRESHOLD;
+      if (chargeRef.current >= 1) {
+        advance();
+        return;
+      }
+      syncChargeUi();
+    };
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown" || e.key === " " || e.key === "Enter") {
         e.preventDefault();
-        advance();
+        chargeRef.current = Math.min(1, chargeRef.current + KEY_CHARGE);
+        if (chargeRef.current >= 1) advance();
+        else syncChargeUi();
       }
     };
-    window.addEventListener("wheel", onWheel, { passive: true });
+
+    window.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKey);
+      if (chargeRaf.current) cancelAnimationFrame(chargeRaf.current);
     };
-  }, [stage]);
+  }, [stage, syncChargeUi]);
 
   const returnToOrientation = useCallback(() => {
     if (busyRef.current) return;
@@ -185,6 +256,7 @@ export function PrologueExperience() {
       busyRef.current = false;
       stepRef.current = 0;
       setStep(0);
+      resetCharge();
       setStage("orientation");
     };
 
@@ -202,7 +274,7 @@ export function PrologueExperience() {
       overwrite: true,
       onComplete: finish,
     });
-  }, [reduced]);
+  }, [reduced, resetCharge]);
 
   const goToStep = useCallback(
     (next: number) => {
@@ -214,6 +286,7 @@ export function PrologueExperience() {
       if (next === stepRef.current) return;
       if (busyRef.current) return;
 
+      resetCharge();
       const panel = panelRef.current;
       const dir = next > stepRef.current ? 1 : -1;
 
@@ -229,7 +302,7 @@ export function PrologueExperience() {
       gsap.to(panel, {
         y: dir > 0 ? -18 : 18,
         autoAlpha: 0,
-        duration: 0.22,
+        duration: 0.2,
         ease: "power2.in",
         overwrite: true,
         onComplete: () => {
@@ -239,20 +312,21 @@ export function PrologueExperience() {
           gsap.to(panel, {
             y: 0,
             autoAlpha: 1,
-            duration: 0.26,
+            duration: 0.24,
             ease: "power2.out",
             overwrite: true,
             onComplete: () => {
               busyRef.current = false;
+              resetCharge();
             },
           });
         },
       });
     },
-    [reduced, returnToOrientation],
+    [reduced, resetCharge, returnToOrientation],
   );
 
-  // Step through cards with wheel / keys — stage stays fixed, no page scroll.
+  // Accumulate scroll into a meter; full meter → next / empty + scroll up → previous.
   useEffect(() => {
     if (stage !== "story") return;
 
@@ -267,30 +341,59 @@ export function PrologueExperience() {
     }
 
     busyRef.current = false;
+    resetCharge();
     if (panelRef.current) {
       gsap.set(panelRef.current, { y: 0, autoAlpha: 1 });
     }
 
-    let wheelLock = 0;
+    const applyCharge = (delta: number) => {
+      if (busyRef.current) return;
+
+      // Last slide: only allow scrolling back (CTA starts the demo)
+      if (stepRef.current >= AIYLA_STEP && delta > 0) {
+        chargeRef.current = Math.max(-1, Math.min(0, chargeRef.current));
+        syncChargeUi();
+        return;
+      }
+
+      // Charge is -1…1: positive fills toward next, negative toward previous.
+      chargeRef.current = Math.max(
+        -1,
+        Math.min(1, chargeRef.current + delta / STEP_DELTA_THRESHOLD),
+      );
+
+      if (chargeRef.current >= 1) {
+        const next = stepRef.current + 1;
+        if (next >= STORY_STEPS) {
+          chargeRef.current = 1;
+          syncChargeUi();
+          return;
+        }
+        goToStep(next);
+        return;
+      }
+
+      if (chargeRef.current <= -1) {
+        goToStep(stepRef.current - 1);
+        return;
+      }
+
+      syncChargeUi();
+    };
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const now = performance.now();
-      if (now < wheelLock || busyRef.current) return;
-      if (Math.abs(e.deltaY) < 6) return;
-
-      wheelLock = now + 380;
-      const dir = e.deltaY > 0 ? 1 : -1;
-      goToStep(stepRef.current + dir);
+      if (Math.abs(e.deltaY) < 1) return;
+      applyCharge(e.deltaY);
     };
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") {
         e.preventDefault();
-        goToStep(stepRef.current + 1);
+        applyCharge(STEP_DELTA_THRESHOLD * KEY_CHARGE);
       } else if (e.key === "ArrowUp" || e.key === "PageUp") {
         e.preventDefault();
-        goToStep(stepRef.current - 1);
+        applyCharge(-STEP_DELTA_THRESHOLD * KEY_CHARGE);
       }
     };
 
@@ -300,8 +403,9 @@ export function PrologueExperience() {
     return () => {
       root?.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKey);
+      if (chargeRaf.current) cancelAnimationFrame(chargeRaf.current);
     };
-  }, [goToStep, stage]);
+  }, [goToStep, resetCharge, stage, syncChargeUi]);
 
   const openPrologueAtStart = useCallback(() => {
     introTweenRef.current?.kill();
@@ -315,7 +419,7 @@ export function PrologueExperience() {
     setDemoIntroLock(false);
     setScrollCueVisible(false);
     setStarting(false);
-    entryStepRef.current = START_STEP;
+    entryStepRef.current = AIYLA_STEP;
     resumeFadeRef.current = true;
     setExperienceStarted(false);
     setStage("story");
@@ -436,60 +540,124 @@ export function PrologueExperience() {
     );
   }, [reduced, stage]);
 
-  const flyIntoCityView = useCallback(() => {
+  const cityScrollTarget = useCallback(() => {
     const cover = document.getElementById("section-cover");
-    if (!cover) {
-      setDemoIntroLock(false);
-      setScrollCueVisible(true);
-      return;
-    }
-
-    // Match cover ScrollTrigger: start "top top" → end "bottom top"
-    const range = Math.max(1, cover.offsetHeight);
-    const targetY = cover.offsetTop + range * prologueStart.introCoverProgress;
-
-    const revealCue = () => {
-      setDemoIntroLock(false);
-      setScrollCueVisible(true);
+    const range = Math.max(1, cover?.offsetHeight ?? window.innerHeight * 2);
+    const p = prologueStart.introCoverProgress;
+    return {
+      p,
+      targetY: (cover?.offsetTop ?? 0) + range * p,
+      targetReveal: Math.min(1, p * 1.15),
     };
+  }, []);
+
+  /** Instant land on the city frame (used when returning from demo). */
+  const openAtCityView = useCallback(() => {
+    introTweenRef.current?.kill();
+    introTweenRef.current = null;
+
+    const { p, targetY, targetReveal } = cityScrollTarget();
+    window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
+    setSection("cover", p);
+    setCoverReveal(targetReveal);
+    setSceneMode("reveal");
+    setCityAwake(p * 0.55);
+    setAttentionMode("cinematic");
+    setActiveDevelopment(null);
+    setEstateBuildingProgress(0);
+    setDemoIntroLock(false);
+    setScrollCueVisible(true);
+    requestCameraSnap();
+  }, [
+    cityScrollTarget,
+    requestCameraSnap,
+    setActiveDevelopment,
+    setAttentionMode,
+    setCityAwake,
+    setCoverReveal,
+    setDemoIntroLock,
+    setEstateBuildingProgress,
+    setSceneMode,
+    setScrollCueVisible,
+    setSection,
+  ]);
+
+  /**
+   * Start handoff: camera already on the city frame, veil fades from black,
+   * with a very slight forward drift — no fly-in from elsewhere.
+   */
+  const wakeIntoCityView = useCallback(() => {
+    introTweenRef.current?.kill();
+    introTweenRef.current = null;
+
+    const { p, targetY, targetReveal } = cityScrollTarget();
+    const startProgress = Math.max(0.12, p - 0.045);
+
+    window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
+    setSection("cover", startProgress);
+    setCoverReveal(0);
+    setSceneMode("reveal");
+    setCityAwake(0);
+    setAttentionMode("cinematic");
+    setActiveDevelopment(null);
+    setEstateBuildingProgress(0);
+    setDemoIntroLock(true);
+    setScrollCueVisible(false);
+    requestCameraSnap();
 
     if (reduced) {
-      window.scrollTo(0, targetY);
-      ScrollTrigger.refresh();
-      revealCue();
+      setSection("cover", p);
+      setCoverReveal(targetReveal);
+      setCityAwake(p * 0.55);
+      setDemoIntroLock(false);
+      setScrollCueVisible(true);
       return;
     }
 
-    setDemoIntroLock(true);
-    const proxy = { y: window.scrollY };
-    introTweenRef.current?.kill();
+    const proxy = { reveal: 0, progress: startProgress, awake: 0 };
     introTweenRef.current = gsap.to(proxy, {
-      y: targetY,
-      duration: 2.4,
-      ease: "power2.inOut",
+      reveal: targetReveal,
+      progress: p,
+      awake: p * 0.55,
+      duration: 1.7,
+      ease: "power2.out",
       overwrite: true,
       onUpdate: () => {
-        window.scrollTo(0, proxy.y);
+        setCoverReveal(proxy.reveal);
+        setSection("cover", proxy.progress);
+        setCityAwake(proxy.awake);
       },
       onComplete: () => {
         introTweenRef.current = null;
-        revealCue();
+        window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
+        setDemoIntroLock(false);
+        setScrollCueVisible(true);
       },
     });
-  }, [reduced, setDemoIntroLock, setScrollCueVisible]);
+  }, [
+    cityScrollTarget,
+    reduced,
+    requestCameraSnap,
+    setActiveDevelopment,
+    setAttentionMode,
+    setCityAwake,
+    setCoverReveal,
+    setDemoIntroLock,
+    setEstateBuildingProgress,
+    setSceneMode,
+    setScrollCueVisible,
+    setSection,
+  ]);
 
   const startExperience = useCallback(() => {
     if (starting || stage === "exiting" || stage === "done") return;
     setStarting(true);
     setStage("exiting");
-    setScrollCueVisible(false);
-    setDemoIntroLock(true);
-
-    window.scrollTo(0, 0);
-    setCoverReveal(0);
-    setSceneMode("cover");
     setAttentionMode("cinematic");
+    // Place camera on the city frame first, then wake the lights/veil.
+    wakeIntoCityView();
     setExperienceStarted(true);
+    requestCameraSnap();
 
     const root = rootRef.current;
     const finish = () => {
@@ -497,7 +665,9 @@ export function PrologueExperience() {
       returningRef.current = false;
       requestAnimationFrame(() => {
         ScrollTrigger.refresh();
-        requestAnimationFrame(() => flyIntoCityView());
+        // Keep the wake-in tween running — only re-pin scroll, don't hard-cut again.
+        const { targetY } = cityScrollTarget();
+        window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
       });
     };
 
@@ -508,26 +678,24 @@ export function PrologueExperience() {
 
     gsap.to(root, {
       autoAlpha: 0,
-      duration: 0.9,
-      ease: "power2.inOut",
+      duration: 0.55,
+      ease: "power2.out",
       onComplete: finish,
     });
   }, [
-    flyIntoCityView,
+    cityScrollTarget,
     reduced,
+    requestCameraSnap,
     setAttentionMode,
-    setCoverReveal,
-    setDemoIntroLock,
     setExperienceStarted,
-    setSceneMode,
-    setScrollCueVisible,
     stage,
     starting,
+    wakeIntoCityView,
   ]);
 
-  // Block user scroll while the Start handoff flies into the city frame.
+  // Hold scroll while the start veil / wake-in is running.
   useEffect(() => {
-    if (stage !== "done") return;
+    if (stage !== "done" && stage !== "exiting") return;
 
     const block = (e: Event) => {
       if (!useScrollStore.getState().demoIntroLock) return;
@@ -547,7 +715,6 @@ export function PrologueExperience() {
   const ambition =
     step < prologueAmbitions.length ? prologueAmbitions[step] : null;
   const showAiyla = step === AIYLA_STEP;
-  const showStart = step === START_STEP;
 
   return (
     <div
@@ -585,6 +752,25 @@ export function PrologueExperience() {
           <p className="mt-6 text-sm text-stone/50">
             {prologueLoadingPhrases[phraseIndex]}
           </p>
+        </div>
+      )}
+
+      {(stage === "orientation" || stage === "story") && (
+        <div
+          className={`prologue__scroll-meter ${
+            Math.abs(slideCharge) > 0.02 ? "is-active" : ""
+          } ${slideCharge < 0 ? "is-back" : ""}`}
+          aria-hidden
+        >
+          <span className="prologue__scroll-meter__label">
+            {slideCharge < -0.02 ? "Back" : "Next"}
+          </span>
+          <div className="prologue__scroll-meter__track">
+            <div
+              className="prologue__scroll-meter__fill"
+              style={{ height: `${Math.abs(slideCharge) * 100}%` }}
+            />
+          </div>
         </div>
       )}
 
@@ -674,53 +860,46 @@ export function PrologueExperience() {
               )}
 
               {showAiyla && (
-                <div className="prologue__box prologue__box--wide">
-                  <p className="prologue__eyebrow">{prologueAiyla.eyebrow}</p>
-                  <h3 className="prologue__display mt-4 text-accent">
-                    {prologueAiyla.headline}
-                  </h3>
-                  <p className="prologue__support mt-6 max-w-2xl">
-                    {prologueAiyla.body}
-                  </p>
-                  <ul className="prologue__tags mt-10">
-                    {prologueAiyla.capabilities.map((c) => (
-                      <li key={c}>{c}</li>
-                    ))}
-                  </ul>
-                  <div className="prologue__link-line" aria-hidden />
-                </div>
-              )}
+                <div className="prologue__box prologue__box--wide prologue__box--finale">
+                  <div className="prologue__finale">
+                    <div className="prologue__finale-brand">
+                      <div className="prologue__brand-block prologue__brand-block--finale">
+                        <RenakerLifeLogo
+                          variant="light"
+                          className="prologue__logo"
+                        />
+                      </div>
+                      <p className="prologue__powered">{prologueAiyla.poweredBy}</p>
+                      <p className="prologue__support mt-5">
+                        {prologueAiyla.body}
+                      </p>
+                    </div>
 
-              {showStart && (
-                <div className="prologue__start-panel">
-                  <div className="prologue__brand-block">
-                    <RenakerLifeLogo
-                      variant="light"
-                      className="prologue__logo"
-                    />
+                    <div className="prologue__finale-cta">
+                      <h3 className="prologue__display">
+                        {prologueStart.headline}
+                      </h3>
+                      <p className="prologue__support mt-5">
+                        {prologueStart.supporting}
+                      </p>
+                      <button
+                        type="button"
+                        className={`prologue__cta prologue__cta--shine mt-10 ${starting ? "is-active" : ""}`}
+                        onClick={startExperience}
+                        disabled={starting}
+                      >
+                        {prologueStart.cta}
+                        <span aria-hidden> →</span>
+                      </button>
+                    </div>
                   </div>
-                  <h3 className="prologue__display mt-10">
-                    {prologueStart.headline}
-                  </h3>
-                  <p className="prologue__support mt-5">
-                    {prologueStart.supporting}
-                  </p>
-                  <button
-                    type="button"
-                    className={`prologue__cta mt-12 ${starting ? "is-active" : ""}`}
-                    onClick={startExperience}
-                    disabled={starting}
-                  >
-                    {prologueStart.cta}
-                    <span aria-hidden> →</span>
-                  </button>
                 </div>
               )}
             </div>
           </div>
 
           <p className="prologue__step-hint" aria-hidden>
-            {step < START_STEP ? "Scroll" : "Ready"}
+            {step < AIYLA_STEP ? "Scroll to continue" : "Ready"}
           </p>
         </div>
       )}

@@ -201,7 +201,7 @@ function ManagementVisual({ active }: { active: boolean }) {
         ))}
       </div>
       <div className={`mt-6 prologue-insight ${on ? "is-on" : ""}`}>
-        <p className="text-[11px] uppercase tracking-[0.14em] text-accent">
+        <p className="text-[11px] uppercase tracking-[0.14em] text-[#e2b93d]">
           AI insight
         </p>
         <p className="mt-2 text-sm text-stone/80">

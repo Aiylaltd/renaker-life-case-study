@@ -33,8 +33,13 @@ export function SceneCanvas() {
   useQualityProfile();
   const debug = useDebug3d();
   const experienceStarted = useScrollStore((s) => s.experienceStarted);
+  const loaderDone = useScrollStore((s) => s.loaderDone);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  // Render while the loading screen covers the canvas so city + towers upload
+  // to the GPU before the user ever sees the 3D view.
+  const warmScene = !loaderDone || experienceStarted;
 
   useEffect(() => {
     setMounted(true);
@@ -65,8 +70,9 @@ export function SceneCanvas() {
               far: cameraDefaults.far,
               position: cameraDefaults.overview.position,
             }}
-            // Freeze the render loop during the HTML prologue — biggest win.
-            frameloop={experienceStarted ? "always" : "never"}
+            // Warm during loading (hidden under prologue), freeze for intro cards,
+            // then run for the demo.
+            frameloop={warmScene ? "always" : "never"}
             style={{ width: "100%", height: "100%", display: "block" }}
             onCreated={({ gl }) => {
               gl.setClearColor("#050506", 1);

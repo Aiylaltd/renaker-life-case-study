@@ -96,6 +96,9 @@ export function useScrollStory(enabled: boolean) {
             setEstateBuildingProgress(0);
           },
           onUpdate: (self) => {
+            // Start handoff owns coverReveal / camera while the veil wakes in
+            if (useScrollStore.getState().demoIntroLock) return;
+
             const p = self.progress;
             const reveal = clamp01(p * 1.15);
             setSection("cover", p);
@@ -107,19 +110,29 @@ export function useScrollStory(enabled: boolean) {
               setSceneMode("cover");
               setActiveDevelopment(null);
               setEstateBuildingProgress(0);
-            } else if (p < 0.62) {
+            } else if (p < 0.58) {
               setSceneMode("reveal");
               setActiveDevelopment(null);
               setEstateBuildingProgress(0);
             } else {
+              // Finish close to the settled DGS frame so hero enter doesn't yank
               setSceneMode("approach");
               if (firstTower) setActiveDevelopment(firstTower);
-              setEstateBuildingProgress(clamp01((p - 0.62) / 0.38) * 0.45);
+              setEstateBuildingProgress(
+                clamp01(0.35 + ((p - 0.58) / 0.42) * 0.4),
+              );
+              setCityAwake(0.6);
             }
           },
           onLeave: () => {
             setCoverReveal(1);
-            setCityAwake(0.55);
+            setCityAwake(0.6);
+            // Hand off already aimed at DGS — keep active so estate never falls through
+            if (firstTower) {
+              setSceneMode("estate");
+              setActiveDevelopment(firstTower);
+              setEstateBuildingProgress(0.62);
+            }
           },
           onLeaveBack: () => {
             setCoverReveal(0);
@@ -162,18 +175,42 @@ export function useScrollStory(enabled: boolean) {
           onEnter: () => {
             setAttentionMode("cinematic");
             setCoverReveal(1);
-            setSceneMode(reduced ? "quiet" : "estate");
+            if (reduced) {
+              setSceneMode("quiet");
+              return;
+            }
+            // Always pair estate + first tower — estate without active falls back to city overview
+            const tower = firstTower ?? (tour[0]?.anchor as AnchorName | undefined);
+            setSceneMode("estate");
+            if (tower) {
+              setActiveDevelopment(tower);
+              setEstateBuildingProgress(0.62);
+            }
+            setCityAwake(0.6);
           },
           onEnterBack: () => {
             setAttentionMode("cinematic");
             setCoverReveal(1);
-            setSceneMode(reduced ? "quiet" : "estate");
+            if (reduced) {
+              setSceneMode("quiet");
+              return;
+            }
+            setSceneMode("estate");
+            const tower = firstTower ?? (tour[0]?.anchor as AnchorName | undefined);
+            if (tower) {
+              setActiveDevelopment(tower);
+              setEstateBuildingProgress(0.62);
+            }
+            setCityAwake(0.6);
           },
           onLeaveBack: () => {
-            // Hand control back to the cover trigger
-            setActiveDevelopment(null);
-            setEstateBuildingProgress(0);
+            // Return to cover approach — keep DGS active so the camera doesn't jump to overview
             setAttentionMode("cinematic");
+            if (firstTower) {
+              setSceneMode("approach");
+              setActiveDevelopment(firstTower);
+              setEstateBuildingProgress(0.7);
+            }
           },
           onUpdate: (self) => {
             const p = self.progress;
@@ -198,23 +235,10 @@ export function useScrollStory(enabled: boolean) {
               return;
             }
 
-            // First tower: short approach only while arriving from cover, then settle
-            if (stop === 0 && slot < 0.18) {
-              setSceneMode(slot < 0.06 ? "estate" : "approach");
-              setActiveDevelopment(tour[0].anchor as AnchorName);
-              setEstateBuildingProgress(
-                clamp01(0.5 + Math.min(slot, 0.12) * 0.4),
-              );
-              setCityAwake(0.6);
-              return;
-            }
-
             const dist = Math.abs(slot - stop);
             // Keep settle progress stable near each snap; ease orbit only while moving
             const buildingProgress =
-              dist < 0.1
-                ? 0.62
-                : clamp01(0.42 + dist * 0.28);
+              dist < 0.1 ? 0.62 : clamp01(0.48 + dist * 0.22);
 
             setSceneMode("estate");
             setActiveDevelopment(tour[stop].anchor as AnchorName);
@@ -315,7 +339,9 @@ export function useScrollStory(enabled: boolean) {
     ScrollTrigger.refresh();
     requestAnimationFrame(() => {
       ScrollTrigger.refresh();
-      if (window.scrollY < 40) {
+      // Only reset to the dark cover if we truly started at the top —
+      // Start-the-experience lands mid-cover on the city frame.
+      if (window.scrollY < 40 && useScrollStore.getState().coverReveal < 0.1) {
         setSection("cover", 0);
         setSceneMode("cover");
         setCoverReveal(0);

@@ -106,17 +106,21 @@ function estateComposition(buildingProgress: number, active: AnchorName) {
 
 /**
  * Cover → first tower: blend wide reveal into DGS arrival.
+ * Progress is authored to finish near the settled estate frame (no pull-back).
  */
 function approachComposition(buildingProgress: number, active: AnchorName) {
   revealFrame(1);
-  const { fov } = towerArrivalFrame(active, buildingProgress);
-  const blend = easeInOutCubic(THREE.MathUtils.clamp(buildingProgress / 0.55, 0, 1));
+  const { fov } = towerArrivalFrame(active, Math.max(buildingProgress, 0.55));
+  // Map 0.35→0.75 building progress onto 0→1 blend so late cover sits on the tower
+  const blend = easeInOutCubic(
+    THREE.MathUtils.clamp((buildingProgress - 0.3) / 0.45, 0, 1),
+  );
 
   _desiredPos.lerpVectors(_fromPos, _towerPos, blend);
   _desiredTarget.lerpVectors(_fromTarget, _towerTarget, blend);
 
   return {
-    lerp: THREE.MathUtils.lerp(0.024, 0.038, blend),
+    lerp: THREE.MathUtils.lerp(0.022, 0.03, blend),
     fov: THREE.MathUtils.lerp(48, fov, blend),
   };
 }
@@ -151,10 +155,17 @@ function compositionForState(): {
     _desiredTarget.copy(_fromTarget);
     lerp = 0.03;
     fov = 48;
-  } else if (mode === "approach" && active) {
-    return approachComposition(state.estateBuildingProgress, active);
-  } else if (mode === "estate" && active) {
-    return estateComposition(state.estateBuildingProgress, active);
+  } else if (mode === "approach") {
+    // Never fall through to city overview mid-handoff
+    return approachComposition(
+      state.estateBuildingProgress,
+      active ?? "ANCHOR_DGS",
+    );
+  } else if (mode === "estate") {
+    return estateComposition(
+      state.estateBuildingProgress || 0.62,
+      active ?? "ANCHOR_DGS",
+    );
   } else if (mode === "estate-overview") {
     _desiredPos.set(-40, 520, 780);
     _desiredTarget.set(-200, 40, 200);
@@ -206,11 +217,30 @@ export function CameraDirector() {
   const lookVel = useRef(new THREE.Vector3());
   const lastActive = useRef<string | null>(null);
   const lastMode = useRef<string | null>(null);
+  const lastSnapNonce = useRef(0);
 
   useFrame((_, delta) => {
     const state = useScrollStore.getState();
     const active = state.activeDevelopment;
     let { lerp, fov } = compositionForState();
+
+    // Hard cut (Start handoff) — skip easing so we don't fly from the default pose
+    if (state.cameraSnapNonce !== lastSnapNonce.current) {
+      lastSnapNonce.current = state.cameraSnapNonce;
+      lastActive.current = active;
+      lastMode.current = state.sceneMode;
+      camera.position.copy(_desiredPos);
+      lookAt.current.copy(_desiredTarget);
+      vel.current.set(0, 0, 0);
+      lookVel.current.set(0, 0, 0);
+      camera.lookAt(lookAt.current);
+      if ("fov" in camera) {
+        const persp = camera as THREE.PerspectiveCamera;
+        persp.fov = fov;
+        persp.updateProjectionMatrix();
+      }
+      return;
+    }
 
     if (active !== lastActive.current) {
       lastActive.current = active;

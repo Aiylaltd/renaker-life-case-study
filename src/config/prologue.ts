@@ -84,16 +84,8 @@ export const prologueAmbitions: PrologueAmbition[] = [
 ];
 
 export const prologueAiyla = {
-  eyebrow: "All powered by",
-  headline: "Aiyla AI.",
+  poweredBy: "Powered by Aiyla",
   body: "One intelligence layer connecting residents, operations, management and the city around them.",
-  capabilities: [
-    "200+ Languages",
-    "AI Concierge",
-    "Automation",
-    "Routing",
-    "Management Insight",
-  ],
 };
 
 export const prologueStart = {
