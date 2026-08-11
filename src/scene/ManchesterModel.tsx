@@ -77,6 +77,15 @@ function carveBuildingsNearPoint(
   });
 }
 
+function isDenseDetailMesh(name: string) {
+  // Higher-poly white detail layer (~142k tris). Keep on desktop only.
+  return (
+    name === "Icosphere.296" ||
+    name === "Icosphere296" ||
+    name.startsWith("Icosphere")
+  );
+}
+
 /**
  * Loads Manchester city GLB, restores metre scale, styles the white city,
  * and ingests any named ANCHOR_* nodes into the registry (world space).
@@ -84,29 +93,26 @@ function carveBuildingsNearPoint(
  */
 export function ManchesterModel() {
   const setModelLoadingState = useScrollStore((s) => s.setModelLoadingState);
+  const qualityProfile = useScrollStore((s) => s.qualityProfile);
   const gltf = useGLTF(sceneAssets.manchester);
   const groupRef = useRef<THREE.Group>(null);
+  const showDenseDetail = qualityProfile === "desktop";
 
   const prepared = useMemo(() => {
     const root = gltf.scene.clone(true);
 
     root.traverse((obj) => {
-      // Legacy helper masses (Three may strip the dot: Cube.006 → Cube006)
-      if (
-        obj.name === "Cube.006" ||
-        obj.name === "Cube006" ||
-        obj.name === "Icosphere.296" ||
-        obj.name === "Icosphere296" ||
-        obj.name.startsWith("Icosphere")
-      ) {
-        obj.visible = false;
-        return;
-      }
-
       if (/anchor_blade\s*[/_\\-]\s*360/i.test(obj.name)) {
         obj.name = "ANCHOR_BLADE_360";
       }
       if (obj.name.startsWith("ANCHOR_")) {
+        obj.visible = false;
+        return;
+      }
+
+      // Cube.006 = mid-detail white masses (~38k). Always on.
+      // Icosphere* = denser white detail — desktop only to keep mobile light.
+      if (isDenseDetailMesh(obj.name) && !showDenseDetail) {
         obj.visible = false;
         return;
       }
@@ -131,7 +137,7 @@ export function ManchesterModel() {
     });
 
     return root;
-  }, [gltf.scene]);
+  }, [gltf.scene, showDenseDetail]);
 
   useLayoutEffect(() => {
     setModelLoadingState("loading");
