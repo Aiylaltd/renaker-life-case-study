@@ -33,6 +33,25 @@ interface ScrollState {
   activeDevelopment: AnchorName | null;
   /** 0–1 progress within the active building's estate slice */
   estateBuildingProgress: number;
+  /** Index into towerChapters during the estate tour */
+  towerChapterIndex: number;
+  /** 0–1 progress within the active tower chapter */
+  towerLocalProgress: number;
+  towerProfileVisible: boolean;
+  towerFeatureVisible: boolean;
+  /** When true, CameraDirector keeps framing nearly still for reading */
+  towerCameraCalm: boolean;
+  /**
+   * True once the live camera has reached the current tower/estate framing.
+   * Overlay cards must wait for this — scroll progress alone is not enough.
+   */
+  towerCameraSettled: boolean;
+  /** Discrete feature-state index within the active chapter */
+  towerFeatureStateIndex: number;
+  /** Index into towerBeats when the stepped tour is active */
+  towerBeatIndex: number;
+  /** When true, wheel is charged per-beat (prologue-style) instead of free scroll */
+  towerTourStepped: boolean;
   activeBusinesses: AnchorName[];
   cityAwake: number;
   dhsIntensity: number;
@@ -60,6 +79,20 @@ interface ScrollState {
   setCoverReveal: (v: number) => void;
   setActiveDevelopment: (a: AnchorName | null) => void;
   setEstateBuildingProgress: (v: number) => void;
+  setTowerJourney: (
+    partial: Partial<{
+      towerChapterIndex: number;
+      towerLocalProgress: number;
+      towerProfileVisible: boolean;
+      towerFeatureVisible: boolean;
+      towerCameraCalm: boolean;
+      towerCameraSettled: boolean;
+      towerFeatureStateIndex: number;
+      towerBeatIndex: number;
+    }>,
+  ) => void;
+  setTowerCameraSettled: (v: boolean) => void;
+  setTowerTourStepped: (v: boolean) => void;
   setActiveBusinesses: (a: AnchorName[]) => void;
   setCityAwake: (v: number) => void;
   setDhsIntensity: (v: number) => void;
@@ -89,6 +122,15 @@ export const useScrollStore = create<ScrollState>((set) => ({
   coverReveal: 0,
   activeDevelopment: null,
   estateBuildingProgress: 0,
+  towerChapterIndex: 0,
+  towerLocalProgress: 0,
+  towerProfileVisible: false,
+  towerFeatureVisible: false,
+  towerCameraCalm: false,
+  towerCameraSettled: false,
+  towerFeatureStateIndex: 0,
+  towerBeatIndex: 0,
+  towerTourStepped: false,
   activeBusinesses: [],
   cityAwake: 0,
   dhsIntensity: 0,
@@ -114,6 +156,9 @@ export const useScrollStore = create<ScrollState>((set) => ({
   setActiveDevelopment: (activeDevelopment) => set({ activeDevelopment }),
   setEstateBuildingProgress: (estateBuildingProgress) =>
     set({ estateBuildingProgress }),
+  setTowerJourney: (partial) => set(partial),
+  setTowerCameraSettled: (towerCameraSettled) => set({ towerCameraSettled }),
+  setTowerTourStepped: (towerTourStepped) => set({ towerTourStepped }),
   setActiveBusinesses: (activeBusinesses) => set({ activeBusinesses }),
   setCityAwake: (cityAwake) => set({ cityAwake }),
   setDhsIntensity: (dhsIntensity) => set({ dhsIntensity }),

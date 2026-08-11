@@ -6,28 +6,30 @@ import { DemoScrollCue } from "@/components/cover/DemoScrollCue";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { CoverSection } from "@/components/sections/CoverSection";
 import { HeroSection } from "@/components/sections/HeroSection";
-import { ProblemSection } from "@/components/sections/ProblemSection";
 import { DhsEarlySection } from "@/components/sections/DhsEarlySection";
-import { ResidentSection } from "@/components/sections/ResidentSection";
-import { StaffSection } from "@/components/sections/StaffSection";
-import { ManagementSection } from "@/components/sections/ManagementSection";
-import { ResultsSection } from "@/components/sections/ResultsSection";
-import { DoorlySection } from "@/components/sections/DoorlySection";
-import { DhsDeepSection } from "@/components/sections/DhsDeepSection";
 import { TrsreSection } from "@/components/sections/TrsreSection";
-import { PlacemakingSection } from "@/components/sections/PlacemakingSection";
 import { VideosSection } from "@/components/sections/VideosSection";
 import { FinaleSection } from "@/components/sections/FinaleSection";
 import { useScrollStory } from "@/hooks/useScrollStory";
+import { useTowerTourSteps } from "@/hooks/useTowerTourSteps";
 import { useScrollStore } from "@/store/scrollStore";
 import { brand } from "@/config/caseStudy";
 import { RenakerLifeLogo } from "@/components/ui/RenakerLifeLogo";
+import { TowerCaseNav } from "@/components/tower/TowerCaseNav";
 import { SceneCanvas } from "@/scene/SceneCanvas";
 
 export function CaseStudyPage() {
   const experienceStarted = useScrollStore((s) => s.experienceStarted);
-  // Gate the existing V1 story until the prologue hands off.
+  const sectionId = useScrollStore((s) => s.sectionId);
+  const chapterIndex = useScrollStore((s) => s.towerChapterIndex);
   useScrollStory(experienceStarted);
+  useTowerTourSteps(experienceStarted);
+
+  // Keep nav through the story so chapter skip stays available past the tower tour.
+  const showCaseNav =
+    experienceStarted &&
+    sectionId !== "loader" &&
+    sectionId !== "finale";
 
   return (
     <>
@@ -50,28 +52,27 @@ export function CaseStudyPage() {
       >
         <header className="pointer-events-none fixed left-0 right-0 top-0 z-20 px-5 py-5 md:px-8">
           <div className="container-wide flex items-center justify-between gap-6">
-            <div className="w-[min(42vw,11.5rem)] mix-blend-difference">
-              <RenakerLifeLogo variant="light" />
+            <div className="flex min-w-0 flex-1 items-center gap-6 md:gap-10">
+              <div className="w-[min(42vw,11.5rem)] shrink-0 mix-blend-difference">
+                <RenakerLifeLogo variant="light" />
+              </div>
+              <TowerCaseNav
+                activeIndex={sectionId === "hero" ? chapterIndex : -1}
+                visible={showCaseNav}
+              />
             </div>
-            <p className="text-xs text-ink/45 mix-blend-difference">
-              Case study · powered by {brand.poweredBy}
-            </p>
+            {!showCaseNav ? (
+              <p className="hidden text-xs text-ink/45 mix-blend-difference sm:block">
+                Case study · powered by {brand.poweredBy}
+              </p>
+            ) : null}
           </div>
         </header>
 
-        {/* Existing V1 order — unchanged */}
         <CoverSection />
         <HeroSection />
-        <ProblemSection />
-        <ResidentSection />
-        <StaffSection />
-        <ManagementSection />
-        <ResultsSection />
         <DhsEarlySection />
-        <DhsDeepSection />
-        <DoorlySection />
         <TrsreSection />
-        <PlacemakingSection />
         <VideosSection />
         <FinaleSection />
 
