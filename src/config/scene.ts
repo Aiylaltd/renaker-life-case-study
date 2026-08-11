@@ -145,7 +145,7 @@ export const qualityProfiles = {
   desktop: {
     dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 24,
+    maxTrsrePins: 6,
     maxDhsPaths: 4,
     postprocessing: false,
     cityDensity: 1,
@@ -153,7 +153,7 @@ export const qualityProfiles = {
   mobile: {
     dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 14,
+    maxTrsrePins: 5,
     maxDhsPaths: 2,
     postprocessing: false,
     cityDensity: 0.55,
@@ -161,7 +161,7 @@ export const qualityProfiles = {
   reduced: {
     dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 8,
+    maxTrsrePins: 4,
     maxDhsPaths: 1,
     postprocessing: false,
     cityDensity: 0.4,
@@ -185,10 +185,10 @@ export const cameraDefaults = {
 };
 
 export const trsrePinConfig = {
-  count: 36,
+  count: 42,
   seed: 20260809,
   spreadX: 900,
   spreadZ: 900,
-  minY: 8,
-  maxY: 28,
+  minY: 55,
+  maxY: 140,
 };

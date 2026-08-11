@@ -1,112 +1,125 @@
 "use client";
 
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
-import { trsrePinConfig } from "@/config/scene";
-import { seededRandom } from "@/scene/quality";
+import { trsrePins, type TrsrePinDifficulty } from "@/config/trsre";
 import { useScrollStore } from "@/store/scrollStore";
 
-export function TRSREMarkers({ maxPins = 40 }: { maxPins?: number }) {
-  const intensity = useScrollStore((s) => s.trsreIntensity);
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const dummy = useMemo(() => new THREE.Object3D(), []);
+const PIN_ORDER: TrsrePinDifficulty[] = ["easy", "medium", "hard"];
 
-  const positions = useMemo(() => {
-    const rand = seededRandom(trsrePinConfig.seed);
-    const count = Math.min(trsrePinConfig.count, maxPins);
-    const pts: THREE.Vector3[] = [];
-    for (let i = 0; i < count; i++) {
-      let x = 0;
-      let z = 0;
-      for (let attempt = 0; attempt < 6; attempt++) {
-        x = (rand() - 0.5) * trsrePinConfig.spreadX;
-        z = (rand() - 0.5) * trsrePinConfig.spreadZ;
-        if (Math.hypot(x, z) > 80) break;
-      }
-      const y =
-        trsrePinConfig.minY +
-        rand() * (trsrePinConfig.maxY - trsrePinConfig.minY);
-      pts.push(new THREE.Vector3(x, y, z));
+/** A few pins only — placed in the DHS→TRSRE camera field of view */
+const FOV_PINS: { offset: [number, number, number]; difficulty: TrsrePinDifficulty }[] =
+  [
+    { offset: [-35, 22, 55], difficulty: "easy" },
+    { offset: [48, 18, 20], difficulty: "medium" },
+    { offset: [10, 26, -25], difficulty: "hard" },
+    { offset: [-55, 16, -10], difficulty: "easy" },
+    { offset: [70, 20, 70], difficulty: "medium" },
+    { offset: [-15, 24, 95], difficulty: "hard" },
+  ];
+
+type PinDatum = {
+  position: THREE.Vector3;
+  difficulty: TrsrePinDifficulty;
+};
+
+function usePinTextures() {
+  const [easy, medium, hard] = useLoader(THREE.TextureLoader, [
+    trsrePins.easy,
+    trsrePins.medium,
+    trsrePins.hard,
+  ]);
+
+  useEffect(() => {
+    for (const tex of [easy, medium, hard]) {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
     }
-    return pts;
-  }, [maxPins]);
+  }, [easy, medium, hard]);
 
-  useFrame(({ clock }) => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    mesh.visible = intensity > 0.01;
-    const t = clock.getElapsedTime();
-    const reveal = Math.floor(intensity * positions.length);
+  return { easy, medium, hard } as const;
+}
 
-    positions.forEach((p, i) => {
+function PinSprites({
+  pins,
+  textures,
+}: {
+  pins: PinDatum[];
+  textures: Record<TrsrePinDifficulty, THREE.Texture>;
+}) {
+  const intensity = useScrollStore((s) => s.trsreIntensity);
+  const group = useRef<THREE.Group>(null);
+  const materials = useMemo(
+    () =>
+      pins.map(
+        (pin) =>
+          new THREE.SpriteMaterial({
+            map: textures[pin.difficulty],
+            transparent: true,
+            depthWrite: false,
+            opacity: 0,
+          }),
+      ),
+    [pins, textures],
+  );
+
+  useEffect(() => {
+    return () => {
+      materials.forEach((m) => m.dispose());
+    };
+  }, [materials]);
+
+  useFrame(() => {
+    if (!group.current) return;
+    group.current.visible = intensity > 0.02;
+    const reveal = Math.floor(Math.min(1, intensity * 1.2) * pins.length);
+
+    group.current.children.forEach((child, i) => {
+      const sprite = child as THREE.Sprite;
       const shown = i < reveal;
-      const pulse = shown ? 1 + Math.sin(t * 2.2 + i) * 0.08 : 0;
-      dummy.position.copy(p);
-      dummy.scale.setScalar(
-        shown ? 4.5 * pulse * Math.min(1, intensity * 1.4) : 0,
-      );
-      dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
+      // Small + quiet — no pulsing
+      const s = shown ? 11 * Math.min(1, 0.7 + intensity * 0.35) : 0;
+      sprite.scale.set(s, s, 1);
+      const mat = sprite.material as THREE.SpriteMaterial;
+      mat.opacity = shown ? Math.min(0.72, 0.28 + intensity * 0.4) : 0;
     });
-    mesh.instanceMatrix.needsUpdate = true;
   });
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[undefined, undefined, positions.length]}
-      frustumCulled
-    >
-      <sphereGeometry args={[1, 8, 8]} />
-      <meshStandardMaterial
-        color="#2a2a2e"
-        emissive="#d4c4a8"
-        emissiveIntensity={0.9}
-        roughness={0.35}
-      />
-    </instancedMesh>
-  );
-}
-
-export function TRSRERoutes() {
-  const intensity = useScrollStore((s) => s.trsreIntensity);
-
-  const routes = useMemo(() => {
-    const rand = seededRandom(trsrePinConfig.seed + 7);
-    return Array.from({ length: 4 }, () => {
-      const a = new THREE.Vector3(
-        (rand() - 0.5) * 700,
-        10,
-        (rand() - 0.5) * 700,
-      );
-      const b = new THREE.Vector3(
-        (rand() - 0.5) * 700,
-        10,
-        (rand() - 0.5) * 700,
-      );
-      const mid = a.clone().lerp(b, 0.5);
-      mid.y = 40;
-      return new THREE.QuadraticBezierCurve3(a, mid, b);
-    });
-  }, []);
-
-  if (intensity < 0.2) return null;
-
-  return (
-    <group>
-      {routes.map((curve, i) => (
-        <mesh key={i}>
-          <tubeGeometry args={[curve, 32, 0.7, 5, false]} />
-          <meshStandardMaterial
-            color="#cfc3b0"
-            emissive="#e8dcc8"
-            emissiveIntensity={0.4 * intensity}
-            transparent
-            opacity={0.45 * intensity}
-          />
-        </mesh>
+    <group ref={group}>
+      {pins.map((pin, i) => (
+        <sprite
+          key={`${pin.difficulty}-${i}`}
+          position={pin.position}
+          material={materials[i]}
+          frustumCulled
+        />
       ))}
     </group>
   );
+}
+
+export function TRSREMarkers({ maxPins = 6 }: { maxPins?: number }) {
+  const textures = usePinTextures();
+
+  const pins = useMemo(() => {
+    // Anchored around the TRSRE look-at so they sit in the current FOV
+    const origin = new THREE.Vector3(25, 20, 30);
+    return FOV_PINS.slice(0, Math.min(maxPins, FOV_PINS.length)).map(
+      (pin, i) => ({
+        position: origin
+          .clone()
+          .add(new THREE.Vector3(...pin.offset)),
+        difficulty: pin.difficulty ?? PIN_ORDER[i % PIN_ORDER.length],
+      }),
+    );
+  }, [maxPins]);
+
+  return <PinSprites pins={pins} textures={textures} />;
+}
+
+/** Kept for SceneManager import compatibility — no busy route web on TRSRE */
+export function TRSRERoutes() {
+  return null;
 }

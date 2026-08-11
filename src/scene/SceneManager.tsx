@@ -145,7 +145,9 @@ function DeferredOverlays({
       {(layer === "doorly" || layer === "trsre" || layer === "finale") && <DoorlyRoutes />}
       {(layer === "trsre" || layer === "finale") && (
         <>
-          <TRSREMarkers maxPins={maxTrsrePins} />
+          <Suspense fallback={null}>
+            <TRSREMarkers maxPins={maxTrsrePins} />
+          </Suspense>
           <TRSRERoutes />
         </>
       )}

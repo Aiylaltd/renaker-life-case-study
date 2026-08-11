@@ -5,7 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useScrollStore } from "@/store/scrollStore";
 import { AnchorRegistry } from "@/scene/AnchorRegistry";
-import { cameraDefaults } from "@/config/scene";
+import { cameraDefaults, RENAKER_ANCHORS } from "@/config/scene";
 import { getDevelopmentByAnchor } from "@/config/developments";
 import type { AnchorName } from "@/config/scene";
 
@@ -96,31 +96,42 @@ function towerArrivalFrame(active: AnchorName, buildingProgress: number) {
 
 /**
  * Settled framing per building — light orbit after arrival.
+ * When calm (feature card reading), freeze near the settled frame.
  */
-function estateComposition(buildingProgress: number, active: AnchorName) {
-  const { fov } = towerArrivalFrame(active, buildingProgress);
+function estateComposition(
+  buildingProgress: number,
+  active: AnchorName,
+  calm: boolean,
+) {
+  const progress = calm
+    ? 0.62 + (buildingProgress - 0.62) * 0.15
+    : buildingProgress;
+  const { fov } = towerArrivalFrame(active, progress);
   _desiredPos.copy(_towerPos);
   _desiredTarget.copy(_towerTarget);
-  return { lerp: 0.026, fov };
+  return { lerp: calm ? 0.012 : 0.026, fov };
 }
 
 /**
  * Cover → first tower: blend wide reveal into DGS arrival.
  * Progress is authored to finish near the settled estate frame (no pull-back).
  */
+/**
+ * Cover → DGS: buildingProgress is 0→1 approach blend.
+ * Starts from the wide city reveal and eases onto the settled tower frame.
+ */
 function approachComposition(buildingProgress: number, active: AnchorName) {
-  revealFrame(1);
-  const { fov } = towerArrivalFrame(active, Math.max(buildingProgress, 0.55));
-  // Map 0.35→0.75 building progress onto 0→1 blend so late cover sits on the tower
-  const blend = easeInOutCubic(
-    THREE.MathUtils.clamp((buildingProgress - 0.3) / 0.45, 0, 1),
-  );
+  const blend = easeInOutCubic(THREE.MathUtils.clamp(buildingProgress, 0, 1));
+  // Start from a late city reveal pose (approach begins ~cover 0.72)
+  revealFrame(THREE.MathUtils.lerp(0.72, 1, blend));
+  const { fov } = towerArrivalFrame(active, 0.62);
 
   _desiredPos.lerpVectors(_fromPos, _towerPos, blend);
   _desiredTarget.lerpVectors(_fromTarget, _towerTarget, blend);
 
   return {
-    lerp: THREE.MathUtils.lerp(0.022, 0.03, blend),
+    // Ease in, then settle — never accelerate into the destination
+    lerp: THREE.MathUtils.lerp(0.018, 0.012, blend),
     fov: THREE.MathUtils.lerp(48, fov, blend),
   };
 }
@@ -165,11 +176,27 @@ function compositionForState(): {
     return estateComposition(
       state.estateBuildingProgress || 0.62,
       active ?? "ANCHOR_DGS",
+      state.towerCameraCalm,
     );
   } else if (mode === "estate-overview") {
-    _desiredPos.set(-40, 520, 780);
-    _desiredTarget.set(-200, 40, 200);
-    lerp = 0.032;
+    // Zoomed out above the portfolio, still facing the towers
+    let cx = 0;
+    let cy = 0;
+    let cz = 0;
+    for (const name of RENAKER_ANCHORS) {
+      const p = AnchorRegistry.getPosition(name);
+      cx += p.x;
+      cy += p.y;
+      cz += p.z;
+    }
+    const n = RENAKER_ANCHORS.length || 1;
+    cx /= n;
+    cy /= n;
+    cz /= n;
+    _desiredPos.set(cx + 160, 760, cz + 980);
+    _desiredTarget.set(cx - 30, cy + 140, cz - 60);
+    lerp = state.towerCameraCalm ? 0.01 : 0.03;
+    fov = 46;
   } else if (mode === "home" && active) {
     const a = AnchorRegistry.getPosition(active);
     _desiredPos.set(a.x + 110, 140, a.z + 180);
@@ -185,9 +212,11 @@ function compositionForState(): {
     _desiredTarget.set(a.x, 80, a.z);
     lerp = state.attentionMode === "editorial" ? 0.01 : 0.018;
   } else if (mode === "trsre") {
-    _desiredPos.set(-100, 420, 560);
-    _desiredTarget.set(0, 20, 0);
-    lerp = state.attentionMode === "editorial" ? 0.01 : 0.016;
+    // Continue from the DHS city frame — soft drift only, no tower pull-back
+    _desiredPos.set(95, 235, 360);
+    _desiredTarget.set(25, 28, 30);
+    lerp = 0.008;
+    fov = 44;
   } else if (mode === "finale") {
     _desiredPos.set(
       0,
@@ -200,7 +229,7 @@ function compositionForState(): {
     _desiredPos.set(-120, 400, 620);
     _desiredTarget.set(40, 40, -20);
     lerp =
-      state.attentionMode === "editorial" || state.sectionId === "problem"
+      state.attentionMode === "editorial"
         ? 0.04
         : 0.018;
   }
@@ -212,17 +241,21 @@ export function CameraDirector() {
   const { camera } = useThree();
   const lookAt = useRef(new THREE.Vector3(...cameraDefaults.overview.target));
   const setCameraDebug = useScrollStore((s) => s.setCameraDebug);
+  const setTowerCameraSettled = useScrollStore((s) => s.setTowerCameraSettled);
   const debugTimer = useRef(0);
   const vel = useRef(new THREE.Vector3());
   const lookVel = useRef(new THREE.Vector3());
   const lastActive = useRef<string | null>(null);
   const lastMode = useRef<string | null>(null);
   const lastSnapNonce = useRef(0);
+  const settledHold = useRef(0);
 
   useFrame((_, delta) => {
     const state = useScrollStore.getState();
     const active = state.activeDevelopment;
-    let { lerp, fov } = compositionForState();
+    const composition = compositionForState();
+    let lerp = composition.lerp;
+    const fov = composition.fov;
 
     // Hard cut (Start handoff) — skip easing so we don't fly from the default pose
     if (state.cameraSnapNonce !== lastSnapNonce.current) {
@@ -233,6 +266,8 @@ export function CameraDirector() {
       lookAt.current.copy(_desiredTarget);
       vel.current.set(0, 0, 0);
       lookVel.current.set(0, 0, 0);
+      settledHold.current = 0;
+      setTowerCameraSettled(false);
       camera.lookAt(lookAt.current);
       if ("fov" in camera) {
         const persp = camera as THREE.PerspectiveCamera;
@@ -244,34 +279,83 @@ export function CameraDirector() {
 
     if (active !== lastActive.current) {
       lastActive.current = active;
-      // Soft handoff between towers — never punch the lerp up
-      lerp = Math.min(lerp, state.sceneMode === "approach" ? 0.022 : 0.03);
+      // Kill residual momentum so tower handoffs don't bounce
+      vel.current.set(0, 0, 0);
+      lookVel.current.set(0, 0, 0);
+      settledHold.current = 0;
+      if (state.towerCameraSettled) setTowerCameraSettled(false);
+      lerp = Math.min(lerp, state.sceneMode === "approach" ? 0.018 : 0.024);
     }
 
     if (state.sceneMode !== lastMode.current) {
+      const prev = lastMode.current;
       lastMode.current = state.sceneMode;
-      if (state.sceneMode === "approach" || state.sceneMode === "reveal") {
-        lerp = Math.min(lerp, 0.024);
+      vel.current.set(0, 0, 0);
+      lookVel.current.set(0, 0, 0);
+      settledHold.current = 0;
+      // Only clear settle when leaving the tour framing — not on every estate tick
+      if (
+        state.sceneMode === "approach" ||
+        state.sceneMode === "reveal" ||
+        state.sceneMode === "cover" ||
+        state.sceneMode === "loading"
+      ) {
+        if (state.towerCameraSettled) setTowerCameraSettled(false);
+      } else if (
+        (state.sceneMode === "estate" || state.sceneMode === "estate-overview") &&
+        prev !== "estate" &&
+        prev !== "estate-overview"
+      ) {
+        if (state.towerCameraSettled) setTowerCameraSettled(false);
+      }
+      if (
+        state.sceneMode === "approach" ||
+        state.sceneMode === "reveal" ||
+        state.sceneMode === "estate"
+      ) {
+        lerp = Math.min(lerp, 0.018);
       }
     }
 
     const dt = Math.min(delta, 0.05);
     const smooth = 1 - Math.exp(-lerp * 60 * dt);
 
+    // Critically-damped-ish follow: damp velocity hard to avoid bungee overshoot
     _toPos.copy(_desiredPos).sub(camera.position);
     vel.current.lerp(_toPos, smooth);
+    vel.current.multiplyScalar(0.82);
     camera.position.addScaledVector(vel.current, smooth);
+    // Direct blend toward target so we can't spring past the destination
+    camera.position.lerp(_desiredPos, smooth * 0.35);
 
-    lookAt.current.lerp(_desiredTarget, smooth * 0.9);
-    _toLook.copy(_desiredTarget).sub(lookAt.current);
-    lookVel.current.lerp(_toLook, smooth);
-    lookAt.current.addScaledVector(lookVel.current, smooth * 0.3);
+    lookAt.current.lerp(_desiredTarget, smooth);
+    lookVel.current.set(0, 0, 0);
     camera.lookAt(lookAt.current);
 
     if ("fov" in camera) {
       const persp = camera as THREE.PerspectiveCamera;
       persp.fov = THREE.MathUtils.lerp(persp.fov, fov, smooth);
       persp.updateProjectionMatrix();
+    }
+
+    // Cards wait until the camera is near the tower frame (city units are large)
+    const mode = state.sceneMode;
+    if (mode === "estate" || mode === "estate-overview") {
+      const posDist = camera.position.distanceTo(_desiredPos);
+      const lookDist = lookAt.current.distanceTo(_desiredTarget);
+      const closeEnough = posDist < 90 && lookDist < 70;
+      settledHold.current += dt;
+      // Distance settle OR time fallback so cards can never get stuck hidden
+      if (
+        !state.towerCameraSettled &&
+        ((closeEnough && settledHold.current > 0.2) ||
+          settledHold.current > 1.1)
+      ) {
+        setTowerCameraSettled(true);
+      }
+    } else if (state.towerCameraSettled) {
+      settledHold.current = 0;
+      setTowerCameraSettled(false);
     }
 
     debugTimer.current += delta;

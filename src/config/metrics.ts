@@ -33,7 +33,7 @@ export const metrics: Metric[] = [
   {
     id: "ai-resolved",
     value: "64%",
-    label: "of AI conversations resolved with no human escalation",
+    label: "of inbound resident queries resolved by AI without human intervention",
     detail: "From 2,100 AI conversations in 30 days.",
   },
   {
@@ -80,4 +80,21 @@ export const trsreProof = {
   quote:
     "I've discovered more about Manchester today than in three years of living here.",
   quoteNote: "Real resident feedback from a TRSRE hunt.",
+};
+
+/**
+ * Tower-tour proof awaiting publication verification.
+ * Do not surface as production copy until verified: true.
+ */
+export const pendingMetrics = {
+  servicesBooked: {
+    value: "6,000+",
+    label: "services booked by residents",
+    verified: false as const,
+  },
+  aiActionsNoIntervention: {
+    value: "24,000+",
+    label: "actions performed by AI without human intervention",
+    verified: false as const,
+  },
 };

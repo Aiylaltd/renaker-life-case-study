@@ -4,6 +4,10 @@ import { useEffect } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { estateTourDevelopments } from "@/config/developments";
+import {
+  resolveChapterTiming,
+  towerChapters,
+} from "@/config/towerChapters";
 import { useScrollStore } from "@/store/scrollStore";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { AnchorName } from "@/config/scene";
@@ -12,6 +16,35 @@ gsap.registerPlugin(ScrollTrigger);
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
+}
+
+/**
+ * Camera settle progress for a chapter-local 0–1.
+ * Never pulls wider after approach — that was causing the DGS “bungee”.
+ */
+function buildingProgressFromLocal(
+  localT: number,
+  calm: boolean,
+  opts?: { firstChapter?: boolean },
+) {
+  const settled = 0.62;
+
+  // DGS: cover already flew us in — hold the settled frame through arrival/read
+  if (opts?.firstChapter) {
+    if (localT < 0.9 || calm) {
+      return settled + Math.sin(localT * Math.PI * 2) * 0.004;
+    }
+    return settled + ((localT - 0.9) / 0.1) * 0.06;
+  }
+
+  // Later towers: gentle push-in only (no wide pull-back)
+  if (localT < 0.18) {
+    return 0.56 + (localT / 0.18) * (settled - 0.56);
+  }
+  if (localT < 0.9 || calm) {
+    return settled + Math.sin(localT * Math.PI * 2) * 0.004;
+  }
+  return settled + ((localT - 0.9) / 0.1) * 0.08;
 }
 
 export function useScrollStory(enabled: boolean) {
@@ -24,6 +57,7 @@ export function useScrollStory(enabled: boolean) {
   const setEstateBuildingProgress = useScrollStore(
     (s) => s.setEstateBuildingProgress,
   );
+  const setTowerJourney = useScrollStore((s) => s.setTowerJourney);
   const setActiveBusinesses = useScrollStore((s) => s.setActiveBusinesses);
   const setDhsIntensity = useScrollStore((s) => s.setDhsIntensity);
   const setTrsreIntensity = useScrollStore((s) => s.setTrsreIntensity);
@@ -110,18 +144,34 @@ export function useScrollStory(enabled: boolean) {
               setSceneMode("cover");
               setActiveDevelopment(null);
               setEstateBuildingProgress(0);
-            } else if (p < 0.58) {
+              setTowerJourney({
+                towerProfileVisible: false,
+                towerFeatureVisible: false,
+              });
+            } else if (p < 0.76) {
+              // Wide city + estate title hold (Start lands ~0.52 here)
               setSceneMode("reveal");
               setActiveDevelopment(null);
               setEstateBuildingProgress(0);
+              setTowerJourney({
+                towerProfileVisible: false,
+                towerFeatureVisible: false,
+                towerCameraSettled: false,
+              });
             } else {
-              // Finish close to the settled DGS frame so hero enter doesn't yank
+              // Approach DGS — 0→1 fly-in after a longer title hold
               setSceneMode("approach");
               if (firstTower) setActiveDevelopment(firstTower);
-              setEstateBuildingProgress(
-                clamp01(0.35 + ((p - 0.58) / 0.42) * 0.4),
-              );
+              const approachT = clamp01((p - 0.76) / 0.24);
+              setEstateBuildingProgress(approachT);
               setCityAwake(0.6);
+              setTowerJourney({
+                towerProfileVisible: false,
+                towerFeatureVisible: false,
+                towerCameraCalm: false,
+                towerCameraSettled: false,
+                towerBeatIndex: 0,
+              });
             }
           },
           onLeave: () => {
@@ -133,6 +183,15 @@ export function useScrollStory(enabled: boolean) {
               setActiveDevelopment(firstTower);
               setEstateBuildingProgress(0.62);
             }
+            setTowerJourney({
+              towerChapterIndex: 0,
+              towerLocalProgress: 0,
+              towerProfileVisible: false,
+              towerFeatureVisible: false,
+              towerCameraCalm: false,
+              towerCameraSettled: false,
+              towerFeatureStateIndex: 0,
+            });
           },
           onLeaveBack: () => {
             setCoverReveal(0);
@@ -145,33 +204,17 @@ export function useScrollStory(enabled: boolean) {
       );
     }
 
-    // Estate tour — snap between developments; allow escape back into cover
+    // Estate tour — chapter-local scroll drives cards; soft snap only at chapter edges
     const hero = document.getElementById("section-hero");
-    const tour = estateTourDevelopments;
-    const tourStops = tour.length + 1; // buildings + overview
-    const stopInc = 1 / (tourStops - 1);
+    const chapters = towerChapters;
+    const chapterCount = chapters.length;
     if (hero) {
       triggers.push(
         ScrollTrigger.create({
           trigger: hero,
           start: "top top",
           end: "bottom bottom",
-          ...(reduced
-            ? {}
-            : {
-                snap: {
-                  snapTo: (value: number) => {
-                    // Near the top: don't yank the user back into the first tower
-                    // when they're trying to return to the cover.
-                    if (value < stopInc * 0.35) return 0;
-                    return Math.round(value / stopInc) * stopInc;
-                  },
-                  duration: { min: 0.4, max: 0.85 },
-                  ease: "power2.inOut",
-                  delay: 0.02,
-                  directional: true,
-                },
-              }),
+          // Stepped wheel charge owns pacing — no GSAP snap fighting it
           onEnter: () => {
             setAttentionMode("cinematic");
             setCoverReveal(1);
@@ -179,13 +222,24 @@ export function useScrollStory(enabled: boolean) {
               setSceneMode("quiet");
               return;
             }
-            // Always pair estate + first tower — estate without active falls back to city overview
-            const tower = firstTower ?? (tour[0]?.anchor as AnchorName | undefined);
+            const tower =
+              firstTower ??
+              (estateTourDevelopments[0]?.anchor as AnchorName | undefined);
             setSceneMode("estate");
             if (tower) {
               setActiveDevelopment(tower);
               setEstateBuildingProgress(0.62);
             }
+            setTowerJourney({
+              towerChapterIndex: 0,
+              towerLocalProgress: 0,
+              towerProfileVisible: false,
+              towerFeatureVisible: false,
+              towerCameraCalm: false,
+              towerCameraSettled: false,
+              towerFeatureStateIndex: 0,
+              towerBeatIndex: 0,
+            });
             setCityAwake(0.6);
           },
           onEnterBack: () => {
@@ -196,7 +250,9 @@ export function useScrollStory(enabled: boolean) {
               return;
             }
             setSceneMode("estate");
-            const tower = firstTower ?? (tour[0]?.anchor as AnchorName | undefined);
+            const tower =
+              firstTower ??
+              (estateTourDevelopments[0]?.anchor as AnchorName | undefined);
             if (tower) {
               setActiveDevelopment(tower);
               setEstateBuildingProgress(0.62);
@@ -204,13 +260,18 @@ export function useScrollStory(enabled: boolean) {
             setCityAwake(0.6);
           },
           onLeaveBack: () => {
-            // Return to cover approach — keep DGS active so the camera doesn't jump to overview
             setAttentionMode("cinematic");
             if (firstTower) {
               setSceneMode("approach");
               setActiveDevelopment(firstTower);
-              setEstateBuildingProgress(0.7);
+              // Near end of approach blend when returning from hero into cover
+              setEstateBuildingProgress(0.85);
             }
+            setTowerJourney({
+              towerProfileVisible: false,
+              towerFeatureVisible: false,
+              towerCameraCalm: false,
+            });
           },
           onUpdate: (self) => {
             const p = self.progress;
@@ -220,109 +281,112 @@ export function useScrollStory(enabled: boolean) {
             if (reduced) {
               setActiveDevelopment(null);
               setSceneMode("quiet");
+              setTowerJourney({
+                towerProfileVisible: false,
+                towerFeatureVisible: false,
+                towerCameraCalm: false,
+              });
               return;
             }
 
-            const slot = p * (tourStops - 1);
-            const stop = Math.min(tourStops - 1, Math.round(slot));
+            // Stepped tour owns chapter/card/camera state — don't fight it
+            if (useScrollStore.getState().towerTourStepped) {
+              return;
+            }
 
-            // Last stop = whole-estate overview
-            if (stop >= tour.length) {
+            const chapterFloat = p * chapterCount;
+            const chapterIndex = Math.min(
+              chapterCount - 1,
+              Math.floor(chapterFloat),
+            );
+            const localT = clamp01(chapterFloat - chapterIndex);
+            const chapter = chapters[chapterIndex];
+            const firstChapter = chapterIndex === 0;
+            const timing = resolveChapterTiming(localT, {
+              estateWide: !chapter.anchor,
+              firstChapter,
+            });
+            const statesLen = Math.max(1, chapter.featureStates.length);
+            const featureStateIndex = Math.min(
+              statesLen - 1,
+              Math.floor(
+                (typeof timing.featureStateIndex === "number"
+                  ? timing.featureStateIndex
+                  : 0) * statesLen,
+              ),
+            );
+
+            setTowerJourney({
+              towerChapterIndex: chapterIndex,
+              towerLocalProgress: localT,
+              towerProfileVisible: timing.profileVisible,
+              towerFeatureVisible: timing.featureVisible,
+              towerCameraCalm: timing.cameraCalm,
+              towerFeatureStateIndex: featureStateIndex,
+            });
+
+            if (!chapter.anchor) {
               setSceneMode("estate-overview");
               setActiveDevelopment(null);
               setEstateBuildingProgress(0);
-              setCityAwake(0.85);
+              setCityAwake(timing.cameraCalm ? 0.92 : 0.82);
+              setAttentionMode(
+                timing.cameraCalm ? "editorial" : "cinematic",
+              );
               return;
             }
 
-            const dist = Math.abs(slot - stop);
-            // Keep settle progress stable near each snap; ease orbit only while moving
-            const buildingProgress =
-              dist < 0.1 ? 0.62 : clamp01(0.48 + dist * 0.22);
-
             setSceneMode("estate");
-            setActiveDevelopment(tour[stop].anchor as AnchorName);
-            setEstateBuildingProgress(buildingProgress);
+            setActiveDevelopment(chapter.anchor);
+            setEstateBuildingProgress(
+              buildingProgressFromLocal(localT, timing.cameraCalm, {
+                firstChapter,
+              }),
+            );
             setCityAwake(0.6);
+            setAttentionMode(
+              timing.cameraCalm ? "editorial" : "cinematic",
+            );
           },
           onLeave: () => {
             setSceneMode("quiet");
             setActiveDevelopment(null);
             setAttentionMode("editorial");
+            setTowerJourney({
+              towerProfileVisible: false,
+              towerFeatureVisible: false,
+              towerCameraCalm: false,
+            });
           },
         }),
       );
     }
 
-    watch("section-problem", "problem", () => {
-      setSceneMode("quiet");
-      setAttentionMode("editorial");
-      setActiveDevelopment(null);
-      setCityAwake(0.45);
-    }, { editorial: true });
-
-    watch("section-resident", "resident", () => {
-      setSceneMode("home");
-      setAttentionMode("editorial");
-      if (!useScrollStore.getState().activeDevelopment) {
-        setActiveDevelopment("ANCHOR_DGS");
-      }
-    }, { editorial: true });
-
-    watch("section-staff", "staff", () => {
-      setSceneMode("quiet");
-      setAttentionMode("editorial");
-    }, { editorial: true });
-
-    watch("section-management", "management", () => {
-      setSceneMode("quiet");
-      setAttentionMode("editorial");
-    }, { editorial: true });
-
-    watch("section-results", "results", () => {
-      setSceneMode("quiet");
-      setAttentionMode("editorial");
-    }, { editorial: true });
-
     watch("section-dhs-early", "dhs-early", (p) => {
       setSceneMode("dhs");
-      setAttentionMode(p < 0.2 ? "cinematic" : "editorial");
-      setDhsIntensity(Math.min(1, p * 1.2));
+      setAttentionMode(p < 0.22 ? "cinematic" : "editorial");
+      setDhsIntensity(Math.min(1, Math.max(0.15, p * 1.15)));
       setActiveBusinesses(["ANCHOR_BIZ1", "ANCHOR_BIZ2", "ANCHOR_BIZ3"]);
-      setCityAwake(0.7);
-    });
-
-    watch("section-dhs-deep", "dhs-deep", (p) => {
-      setSceneMode("dhs");
-      setAttentionMode("editorial");
-      setDhsIntensity(0.55 + p * 0.35);
-    }, { editorial: true });
-
-    watch("section-doorly", "doorly", (p) => {
-      setSceneMode("doorly");
-      setAttentionMode(p < 0.25 ? "cinematic" : "editorial");
-      setDoorlyIntensity(Math.min(1, p * 1.1));
-      setDhsIntensity(Math.max(0, 0.35 - p * 0.3));
+      setActiveDevelopment(null);
+      setCityAwake(0.75);
+      setDoorlyIntensity(0);
+      setTrsreIntensity(0);
     });
 
     watch("section-trsre", "trsre", (p) => {
       setSceneMode("trsre");
-      setAttentionMode(p < 0.2 ? "cinematic" : "editorial");
-      setTrsreIntensity(Math.min(1, p * 1.15));
-      setDoorlyIntensity(Math.max(0, 0.3 - p * 0.3));
-      setDhsIntensity(0);
-    });
-
-    watch("section-placemaking", "placemaking", () => {
-      setSceneMode("quiet");
+      // Stay calm — soft pin fade-in, no cinematic whip
       setAttentionMode("editorial");
-      setTrsreIntensity(0.25);
-    }, { editorial: true });
+      setTrsreIntensity(Math.min(1, 0.15 + p * 0.75));
+      setDhsIntensity(Math.max(0.12, 0.4 - p * 0.25));
+      setDoorlyIntensity(0);
+    });
 
     watch("section-videos", "videos", () => {
       setSceneMode("quiet");
       setAttentionMode("editorial");
       setTrsreIntensity(0);
+      setDhsIntensity(0);
       setDoorlyIntensity(0);
     }, { editorial: true });
 
@@ -331,9 +395,9 @@ export function useScrollStory(enabled: boolean) {
       setAttentionMode("cinematic");
       setHaze(Math.min(1, p * 1.1));
       setOrbReveal(Math.max(0, (p - 0.35) * 1.6));
-      setDhsIntensity(Math.max(0, 0.4 - p * 0.5));
+      setDhsIntensity(Math.max(0, 0.35 - p * 0.5));
       setTrsreIntensity(Math.max(0, 0.25 - p * 0.3));
-      setDoorlyIntensity(Math.max(0, 0.2 - p * 0.3));
+      setDoorlyIntensity(0);
     });
 
     ScrollTrigger.refresh();
@@ -363,6 +427,7 @@ export function useScrollStory(enabled: boolean) {
     setCoverReveal,
     setActiveDevelopment,
     setEstateBuildingProgress,
+    setTowerJourney,
     setActiveBusinesses,
     setDhsIntensity,
     setTrsreIntensity,

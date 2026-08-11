@@ -37,12 +37,12 @@ export function DigitalHighStreetPaths({ maxPaths = 6 }: { maxPaths?: number }) 
           <mesh key={name}>
             <tubeGeometry args={[curve, 48, lit ? 1.4 : 0.8, 6, false]} />
             <meshStandardMaterial
-              color="#e6d7c2"
-              emissive="#f0e4d2"
-              emissiveIntensity={0.3 + intensity * 0.7 + (lit ? 0.6 : 0)}
+              color="#7c3aed"
+              emissive="#8b5cf6"
+              emissiveIntensity={0.35 + intensity * 0.85 + (lit ? 0.7 : 0)}
               transparent
-              opacity={0.35 + intensity * 0.5}
-              roughness={0.4}
+              opacity={0.4 + intensity * 0.55}
+              roughness={0.35}
             />
           </mesh>
         );

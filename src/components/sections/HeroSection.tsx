@@ -1,9 +1,7 @@
 "use client";
 
 import { sections } from "@/config/caseStudy";
-import { estateTourDevelopments } from "@/config/developments";
-import { DevelopmentProfile } from "@/components/ui/DevelopmentProfile";
-import { LiveStatusCard } from "@/components/ui/LiveStatusCard";
+import { TowerOverlaySystem } from "@/components/tower/TowerOverlaySystem";
 import { useScrollStore } from "@/store/scrollStore";
 
 function clamp01(n: number) {
@@ -11,32 +9,23 @@ function clamp01(n: number) {
 }
 
 export function HeroSection() {
-  const active = useScrollStore((s) => s.activeDevelopment);
-  const sceneMode = useScrollStore((s) => s.sceneMode);
   const sectionId = useScrollStore((s) => s.sectionId);
   const coverReveal = useScrollStore((s) => s.coverReveal);
-  const heroProgress = useScrollStore((s) =>
-    s.sectionId === "hero" ? s.sectionProgress : 0,
-  );
+  const sceneMode = useScrollStore((s) => s.sceneMode);
+  const approachProgress = useScrollStore((s) => s.estateBuildingProgress);
 
-  const tourStops = estateTourDevelopments.length + 1;
-  const overviewThreshold = (tourStops - 1.15) / (tourStops - 1);
-
-  // Entry headline only on the cover runway — clears before the first tower card.
-  const entryOpacity =
-    sectionId === "cover" ? clamp01((coverReveal - 0.22) / 0.28) : 0;
+  // City title holds through the wide estate view, then fades slowly
+  // once the Deansgate approach is well underway.
+  let entryOpacity = 0;
+  if (sectionId === "cover") {
+    if (sceneMode === "approach") {
+      if (approachProgress < 0.42) entryOpacity = 1;
+      else entryOpacity = 1 - clamp01((approachProgress - 0.42) / 0.48);
+    } else if (sceneMode === "reveal" || sceneMode === "cover") {
+      entryOpacity = clamp01((coverReveal - 0.18) / 0.22);
+    }
+  }
   const showEntry = entryOpacity > 0.02;
-
-  const showOverview =
-    sceneMode === "estate-overview" ||
-    (sectionId === "hero" && heroProgress > overviewThreshold);
-  const activeDev = estateTourDevelopments.find((d) => d.anchor === active);
-  // First snap sits at heroProgress 0 — don't gate cards on a mid-section threshold.
-  const showCards =
-    (sceneMode === "estate" || sceneMode === "approach") &&
-    !!activeDev &&
-    sectionId === "hero" &&
-    !showOverview;
 
   return (
     <section
@@ -45,7 +34,7 @@ export function HeroSection() {
       aria-labelledby="hero-heading"
     >
       <div
-        className={`pointer-events-none fixed inset-0 z-[15] flex items-end pb-[12vh] md:items-center md:pb-0 transition-opacity duration-500 ${
+        className={`pointer-events-none fixed inset-0 z-[15] flex items-end pb-[12vh] md:items-center md:pb-0 transition-opacity duration-[1400ms] ease-out ${
           showEntry ? "" : "invisible"
         }`}
         style={{ opacity: entryOpacity }}
@@ -65,46 +54,9 @@ export function HeroSection() {
         </div>
       </div>
 
-      <div className="sticky top-0 flex min-h-[100svh] items-center">
-        <div className="container-wide grid w-full gap-6 lg:grid-cols-[1fr_minmax(280px,360px)] lg:items-end">
-          <div
-            className={`transition-opacity duration-700 ${
-              showOverview && !showEntry
-                ? "opacity-100"
-                : "pointer-events-none opacity-0"
-            }`}
-          >
-            {showOverview && !showEntry && (
-              <h2 className="max-w-3xl text-display editorial-type">
-                {sections.hero.overviewLine}
-              </h2>
-            )}
-          </div>
+      <TowerOverlaySystem />
 
-          <div
-            className={`flex w-full flex-col gap-3 justify-self-end transition-opacity duration-500 ${
-              showCards ? "opacity-100" : "pointer-events-none opacity-0"
-            }`}
-          >
-            {estateTourDevelopments.map((dev) => {
-              const on = active === dev.anchor && showCards;
-              return (
-                <div
-                  key={dev.id}
-                  className={on ? "flex flex-col gap-3" : "hidden"}
-                >
-                  <DevelopmentProfile
-                    development={dev}
-                    visible={on}
-                    side={dev.camera.overlaySide}
-                  />
-                  <LiveStatusCard development={dev} visible={on} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      <div className="sticky top-0 min-h-[100svh]" aria-hidden />
     </section>
   );
 }
