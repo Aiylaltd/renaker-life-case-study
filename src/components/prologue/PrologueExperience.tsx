@@ -860,8 +860,8 @@ export function PrologueExperience() {
               )}
 
               {showAiyla && (
-                <div className="prologue__box prologue__box--wide prologue__box--finale">
-                  <div className="prologue__finale">
+                <div className="prologue__finale">
+                  <div className="prologue__box prologue__box--finale-brand">
                     <div className="prologue__finale-brand">
                       <div className="prologue__brand-block prologue__brand-block--finale">
                         <RenakerLifeLogo
@@ -874,24 +874,27 @@ export function PrologueExperience() {
                         {prologueAiyla.body}
                       </p>
                     </div>
+                  </div>
 
-                    <div className="prologue__finale-cta">
-                      <h3 className="prologue__display">
-                        {prologueStart.headline}
-                      </h3>
-                      <p className="prologue__support mt-5">
-                        {prologueStart.supporting}
-                      </p>
-                      <button
-                        type="button"
-                        className={`prologue__cta prologue__cta--shine mt-10 ${starting ? "is-active" : ""}`}
-                        onClick={startExperience}
-                        disabled={starting}
-                      >
-                        {prologueStart.cta}
-                        <span aria-hidden> →</span>
-                      </button>
-                    </div>
+                  <div className="prologue__finale-cta">
+                    <h3 className="prologue__display">
+                      {prologueStart.headline}
+                    </h3>
+                    <p className="prologue__finale-prompt">
+                      {prologueStart.prompt}
+                    </p>
+                    <p className="prologue__support mt-3">
+                      {prologueStart.supporting}
+                    </p>
+                    <button
+                      type="button"
+                      className={`prologue__cta prologue__cta--pulse mt-10 ${starting ? "is-active" : ""}`}
+                      onClick={startExperience}
+                      disabled={starting}
+                    >
+                      {prologueStart.cta}
+                      <span aria-hidden> →</span>
+                    </button>
                   </div>
                 </div>
               )}

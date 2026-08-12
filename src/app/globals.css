@@ -226,6 +226,164 @@
     min-height: 220svh;
   }
 
+  .story-section--videos {
+    position: relative;
+    min-height: 420svh;
+  }
+
+  .videos-stage {
+    position: sticky;
+    top: 0;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1.25rem;
+    padding: 5rem 0 2rem;
+    overflow: hidden;
+  }
+
+  .videos-stage__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-inline: clamp(1.25rem, 4vw, 3rem);
+    width: min(100%, 72rem);
+    margin-inline: auto;
+  }
+
+  .videos-stage__hint {
+    margin: 0;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(10, 10, 11, 0.4);
+  }
+
+  .videos-viewport {
+    --video-card-w: min(92vw, 58rem);
+    --video-gap: clamp(1rem, 2.5vw, 1.75rem);
+    width: 100%;
+    overflow: hidden;
+    /* First (and each) card sits dead-centre in the viewport */
+    padding-left: calc(50vw - (var(--video-card-w) / 2));
+    padding-right: calc(50vw - (var(--video-card-w) / 2));
+  }
+
+  .videos-track {
+    display: flex;
+    align-items: stretch;
+    gap: var(--video-gap);
+    width: max-content;
+    will-change: transform;
+  }
+
+  .video-card {
+    flex: 0 0 var(--video-card-w);
+    width: var(--video-card-w);
+    opacity: 0.38;
+    transform: scale(0.94);
+    transform-origin: center center;
+    transition:
+      opacity 0.45s var(--ease-premium),
+      transform 0.45s var(--ease-premium);
+    pointer-events: none;
+  }
+
+  .video-card.is-active {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+
+  .video-card.is-upcoming {
+    opacity: 0.7;
+    transform: scale(0.97);
+  }
+
+  .video-card__panel {
+    height: 100%;
+    padding: 0.85rem;
+  }
+
+  @media (min-width: 768px) {
+    .video-card__panel {
+      padding: 1.15rem;
+    }
+  }
+
+  .video-card__media {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 1.15rem;
+    background: rgba(10, 10, 11, 0.9);
+  }
+
+  .video-card__media--placeholder {
+    background: transparent;
+  }
+
+  .video-card__placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: rgba(10, 10, 11, 0.5);
+    background: rgba(245, 242, 237, 0.35);
+  }
+
+  .video-card__play {
+    display: flex;
+    height: 3.5rem;
+    width: 3.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(10, 10, 11, 0.15);
+    background: rgba(255, 255, 255, 0.5);
+    padding-left: 0.15rem;
+    font-size: 1.1rem;
+  }
+
+  .video-card__copy {
+    padding: 1.2rem 0.85rem 0.7rem;
+  }
+
+  @media (min-width: 768px) {
+    .video-card__copy {
+      padding: 1.45rem 1.1rem 0.85rem;
+    }
+  }
+
+  .videos-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.45rem;
+    padding-top: 0.35rem;
+  }
+
+  .videos-dots__dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 999px;
+    background: rgba(10, 10, 11, 0.18);
+    transition:
+      background 0.35s var(--ease-premium),
+      transform 0.35s var(--ease-premium),
+      width 0.35s var(--ease-premium);
+  }
+
+  .videos-dots__dot.is-active {
+    width: 1.35rem;
+    background: rgba(10, 10, 11, 0.55);
+  }
+
   .story-section--dhs {
     min-height: 300svh;
   }
@@ -1993,12 +2151,20 @@
     min-height: min(56vh, 520px);
   }
 
+  .prologue__box--finale-brand {
+    min-height: 0;
+    padding: clamp(2rem, 3.5vw, 3rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
   .prologue__finale {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
     gap: clamp(2rem, 5vw, 4.5rem);
     align-items: center;
-    width: 100%;
+    width: min(100%, 68rem);
   }
 
   .prologue__brand-block--finale {
@@ -2013,10 +2179,22 @@
     color: rgba(226, 185, 61, 0.78);
   }
 
+  .prologue__finale-cta {
+    padding-inline: clamp(0.25rem, 1vw, 0.75rem);
+  }
+
   .prologue__finale-cta .prologue__display {
     max-width: 14ch;
     font-size: clamp(1.55rem, 2.6vw, 2.35rem);
     letter-spacing: -0.03em;
+  }
+
+  .prologue__finale-prompt {
+    margin: 1.1rem 0 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(226, 185, 61, 0.78);
   }
 
   .prologue__finale-brand .prologue__support {
@@ -2130,6 +2308,32 @@
     background: #161618;
   }
 
+  .prologue__cta--pulse {
+    border: 1px solid rgba(226, 185, 61, 0.55);
+    background: rgba(226, 185, 61, 0.12);
+    color: #f5f2ed;
+    box-shadow:
+      0 0 0 0 rgba(226, 185, 61, 0.45),
+      0 0 24px rgba(226, 185, 61, 0.18);
+    animation: prologue-cta-pulse 1.7s ease-out infinite;
+  }
+
+  .prologue__cta--pulse:hover {
+    background: rgba(226, 185, 61, 0.2);
+    border-color: rgba(226, 185, 61, 0.85);
+  }
+
+  .prologue__cta--pulse.is-active {
+    animation: none;
+    transform: scale(0.98);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .prologue__cta--pulse {
+      animation: none;
+    }
+  }
+
   @keyframes prologue-cta-edge {
     0%,
     100% {
@@ -2137,6 +2341,30 @@
     }
     50% {
       border-color: rgba(255, 255, 255, 0.55);
+    }
+  }
+
+  @keyframes prologue-cta-pulse {
+    0% {
+      transform: scale(1);
+      box-shadow:
+        0 0 0 0 rgba(226, 185, 61, 0.5),
+        0 0 18px rgba(226, 185, 61, 0.2);
+      border-color: rgba(226, 185, 61, 0.55);
+    }
+    55% {
+      transform: scale(1.045);
+      box-shadow:
+        0 0 0 16px rgba(226, 185, 61, 0),
+        0 0 36px rgba(226, 185, 61, 0.35);
+      border-color: rgba(226, 185, 61, 0.95);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow:
+        0 0 0 0 rgba(226, 185, 61, 0),
+        0 0 18px rgba(226, 185, 61, 0.16);
+      border-color: rgba(226, 185, 61, 0.55);
     }
   }
 
@@ -2723,6 +2951,18 @@
   @media (max-width: 768px) {
     .story-section--pin {
       min-height: 180svh;
+    }
+
+    .videos-viewport {
+      --video-card-w: min(94vw, 28rem);
+    }
+
+    .story-section--videos {
+      min-height: 380svh;
+    }
+
+    .videos-stage__hint {
+      display: none;
     }
 
     .story-section--cover {

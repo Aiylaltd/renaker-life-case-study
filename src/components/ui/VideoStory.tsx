@@ -1,34 +1,69 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { VideoStoryConfig } from "@/config/videos";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 
-export function VideoStory({ story }: { story: VideoStoryConfig }) {
+export function VideoStory({
+  story,
+  active = true,
+  upcoming = false,
+}: {
+  story: VideoStoryConfig;
+  active?: boolean;
+  upcoming?: boolean;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (!active) {
+      el.pause();
+    }
+  }, [active]);
+
   return (
-    <article className="w-full max-w-3xl mx-auto" aria-labelledby={`video-${story.id}`}>
-      <GlassPanel variant="light" className="p-3 md:p-4">
-        <div
-          className="placeholder-surface relative aspect-video w-full overflow-hidden rounded-[1.1rem]"
-          role="img"
-          aria-label={story.posterLabel}
-        >
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-ink/50">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-ink/15 bg-white/50">
-              <span className="ml-1 text-lg" aria-hidden>
-                ▶
-              </span>
-            </div>
-            <p className="text-label">{story.posterLabel}</p>
-            <p className="text-xs text-muted-dark">{story.durationNote}</p>
+    <article
+      className={`video-card ${active ? "is-active" : ""} ${upcoming ? "is-upcoming" : ""}`}
+      aria-labelledby={`video-${story.id}`}
+      aria-hidden={!active && !upcoming}
+    >
+      <GlassPanel variant="light" className="video-card__panel">
+        {story.src ? (
+          <div className="video-card__media">
+            <video
+              ref={videoRef}
+              className="h-full w-full object-cover"
+              controls={active}
+              playsInline
+              preload="metadata"
+              aria-label={story.posterLabel}
+            >
+              <source src={story.src} type="video/mp4" />
+            </video>
           </div>
-        </div>
-        <div className="px-3 pb-3 pt-5 md:px-5 md:pb-5">
+        ) : (
+          <div
+            className="video-card__media video-card__media--placeholder"
+            role="img"
+            aria-label={story.posterLabel}
+          >
+            <div className="video-card__placeholder">
+              <div className="video-card__play" aria-hidden>
+                ▶
+              </div>
+              <p className="text-label">{story.posterLabel}</p>
+              <p className="text-xs text-muted-dark">{story.durationNote}</p>
+            </div>
+          </div>
+        )}
+        <div className="video-card__copy">
           <p className="text-label text-muted-dark">{story.role}</p>
           <h3 id={`video-${story.id}`} className="mt-2 text-headline">
             {story.title}
           </h3>
           <p className="mt-3 text-body text-ink/70">{story.preview}</p>
-          {/* Captions: attach <track kind="captions"> when video sources arrive */}
         </div>
       </GlassPanel>
     </article>

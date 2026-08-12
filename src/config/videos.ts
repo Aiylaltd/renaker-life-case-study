@@ -3,6 +3,8 @@ export interface VideoStoryConfig {
   role: string;
   title: string;
   preview: string;
+  /** Public path when the filmed asset is ready */
+  src?: string;
   /** Placeholder until filmed assets arrive */
   posterLabel: string;
   durationNote: string;
@@ -10,27 +12,29 @@ export interface VideoStoryConfig {
 
 export const videoStories: VideoStoryConfig[] = [
   {
-    id: "ceo",
-    role: "CEO / Founder",
+    id: "michael",
+    role: "Michael · CEO / Co-Founder",
     title: "The vision",
     preview: "Why Renaker chose to build one connected resident experience.",
-    posterLabel: "Video placeholder — CEO / founder",
-    durationNote: "Approx. 30–60 seconds",
+    src: "/videos/case-study-m.mp4",
+    posterLabel: "Michael — CEO / Co-Founder",
+    durationNote: "Play",
   },
   {
-    id: "cto",
-    role: "CTO",
+    id: "jordan",
+    role: "Jordan · CTO / Co-Founder",
     title: "How it works",
     preview: "The intelligence layer that connects buildings, people and place.",
-    posterLabel: "Video placeholder — CTO",
-    durationNote: "Approx. 30–60 seconds",
+    src: "/videos/case-study-j.mp4",
+    posterLabel: "Jordan — CTO / Co-Founder",
+    durationNote: "Play",
   },
   {
     id: "client",
     role: "Renaker client",
     title: "The impact",
     preview: "What changes when an estate runs on one intelligent platform.",
-    posterLabel: "Video placeholder — Renaker client",
-    durationNote: "Approx. 30–60 seconds",
+    posterLabel: "Video coming soon — Renaker client",
+    durationNote: "Awaiting final cut",
   },
 ];

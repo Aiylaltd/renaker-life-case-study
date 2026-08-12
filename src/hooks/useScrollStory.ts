@@ -77,7 +77,11 @@ export function useScrollStory(enabled: boolean) {
       id: string,
       section: Parameters<typeof setSection>[0],
       onUpdate?: (p: number) => void,
-      opts?: { editorial?: boolean },
+      opts?: {
+        editorial?: boolean;
+        enterProgress?: number;
+        enterBackProgress?: number;
+      },
     ) => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -86,11 +90,11 @@ export function useScrollStory(enabled: boolean) {
         start: "top center",
         end: "bottom center",
         onEnter: () => {
-          setSection(section, 0);
+          setSection(section, opts?.enterProgress ?? 0);
           if (opts?.editorial) setAttentionMode("editorial");
         },
         onEnterBack: () => {
-          setSection(section, 0);
+          setSection(section, opts?.enterBackProgress ?? 0);
           if (opts?.editorial) setAttentionMode("editorial");
         },
         onUpdate: (self) => {
@@ -388,7 +392,7 @@ export function useScrollStory(enabled: boolean) {
       setTrsreIntensity(0);
       setDhsIntensity(0);
       setDoorlyIntensity(0);
-    }, { editorial: true });
+    }, { editorial: true, enterProgress: 0, enterBackProgress: 1 });
 
     watch("section-finale", "finale", (p) => {
       setSceneMode("finale");

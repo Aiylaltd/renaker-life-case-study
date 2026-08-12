@@ -91,6 +91,7 @@ export const prologueAiyla = {
 export const prologueStart = {
   brand: "Renaker Life",
   headline: "Explore the estate.",
+  prompt: "Click below",
   supporting: "See Renaker Life operating across Manchester.",
   cta: "Start the experience",
   /** Cover-section progress for the first wide city frame (reveal, before tower approach). */
