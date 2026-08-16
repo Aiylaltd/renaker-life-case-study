@@ -1854,7 +1854,7 @@
 
   .tower-feature__supporting {
     margin-top: 0.75rem;
-    max-width: 36ch;
+    max-width: 52ch;
     font-size: 0.95rem;
     line-height: 1.45;
     color: rgba(10, 10, 11, 0.62);
@@ -3119,6 +3119,69 @@
     color: rgba(245, 242, 237, 0.4);
   }
 
+  .prologue__result {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    margin-top: 2rem;
+    padding: 1rem 1.1rem;
+    border-radius: 1.1rem;
+    border: 1px solid rgba(62, 207, 122, 0.22);
+    background: rgba(62, 207, 122, 0.06);
+  }
+
+  .prologue__result-dot {
+    flex-shrink: 0;
+    width: 0.55rem;
+    height: 0.55rem;
+    margin-top: 0.35rem;
+    border-radius: 999px;
+    background: #3ecf7a;
+    box-shadow:
+      0 0 0 0 rgba(62, 207, 122, 0.55),
+      0 0 12px rgba(62, 207, 122, 0.55);
+    animation: prologue-live-pulse 2.2s var(--ease-premium) infinite;
+  }
+
+  @keyframes prologue-live-pulse {
+    0% {
+      box-shadow:
+        0 0 0 0 rgba(62, 207, 122, 0.55),
+        0 0 10px rgba(62, 207, 122, 0.45);
+    }
+    70% {
+      box-shadow:
+        0 0 0 10px rgba(62, 207, 122, 0),
+        0 0 18px rgba(62, 207, 122, 0.15);
+    }
+    100% {
+      box-shadow:
+        0 0 0 0 rgba(62, 207, 122, 0),
+        0 0 10px rgba(62, 207, 122, 0.45);
+    }
+  }
+
+  .prologue__result-copy {
+    min-width: 0;
+  }
+
+  .prologue__result-title {
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: rgba(245, 242, 237, 0.92);
+  }
+
+  .prologue__result-body {
+    margin: 0.45rem 0 0;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: rgba(245, 242, 237, 0.62);
+  }
+
   .prologue__rail {
     position: absolute;
     top: 1.25rem;
@@ -3732,6 +3795,104 @@
     margin-top: 0.35rem;
     font-size: 0.75rem;
     color: rgba(245, 242, 237, 0.38);
+  }
+
+  .prologue-platform {
+    width: min(100%, 440px);
+  }
+
+  .prologue-platform__head {
+    margin-bottom: 1.1rem;
+  }
+
+  .prologue-platform__tagline {
+    margin-top: 0.65rem;
+    font-size: 1.05rem;
+    line-height: 1.35;
+    letter-spacing: -0.02em;
+    color: rgba(245, 242, 237, 0.88);
+  }
+
+  .prologue-platform__layers {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .prologue-platform__card {
+    border-radius: 1.1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.035);
+    padding: 0.9rem 1rem;
+    opacity: 0;
+    transform: translateY(10px);
+    transition:
+      opacity 0.55s var(--ease-premium),
+      transform 0.55s var(--ease-premium);
+  }
+
+  .prologue-platform__card.is-on {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .prologue-platform__card--ai {
+    padding: 0.75rem 1rem;
+    border-color: rgba(167, 139, 250, 0.35);
+    background: linear-gradient(
+      135deg,
+      rgba(124, 58, 237, 0.22),
+      rgba(255, 255, 255, 0.04)
+    );
+    box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.12);
+  }
+
+  .prologue-platform__card--ai .prologue-platform__role {
+    color: #c4b5fd;
+  }
+
+  .prologue-platform__card--ai .prologue-platform__line {
+    font-size: 0.88rem;
+    font-weight: 400;
+    color: rgba(245, 242, 237, 0.82);
+  }
+
+  .prologue-platform--solution .prologue-platform__layers {
+    gap: 0.55rem;
+  }
+
+  .prologue-platform--solution .prologue-platform__card:not(.prologue-platform__card--ai) {
+    padding: 0.75rem 0.95rem;
+  }
+
+  .prologue-platform__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .prologue-platform__role {
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #e2b93d;
+    font-weight: 500;
+  }
+
+  .prologue-platform__meta {
+    font-size: 0.75rem;
+    color: rgba(245, 242, 237, 0.38);
+  }
+
+  .prologue-platform__line {
+    margin-top: 0.35rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: rgba(245, 242, 237, 0.92);
   }
 
   .cover-veil {

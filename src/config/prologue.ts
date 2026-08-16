@@ -15,7 +15,7 @@ export const prologueLoadingPhrases = [
 export const prologueOrientation = {
   brand: "Renaker Life",
   headline: "A Digital Experience to Match Incredible Buildings",
-  body: "Renaker, one of the UK’s leading residential developers, partnered with Aiyla to create a digital experience worthy of its buildings — replacing fragmented systems with one intelligent platform and transforming how residents live, teams operate and management understands the estate.",
+  body: "Renaker, one of the UK’s leading residential developers, chose Aiyla to create a digital experience worthy of its buildings — replacing fragmented systems with one intelligent platform and transforming how residents live, teams operate and management understands the estate.",
   continueHint: "Scroll to continue",
   stats: [
     { value: "7", label: "Developments" },
@@ -25,11 +25,7 @@ export const prologueOrientation = {
   ],
 };
 
-export type PrologueAmbitionId =
-  | "resident"
-  | "operations"
-  | "management"
-  | "city";
+export type PrologueAmbitionId = "problem" | "solution";
 
 export interface PrologueAmbition {
   id: PrologueAmbitionId;
@@ -39,53 +35,48 @@ export interface PrologueAmbition {
   headline: string;
   body: string;
   tags: string[];
+  /** Optional live result card — replaces tags when present */
+  result?: {
+    title: string;
+    body: string;
+  };
 }
 
 /** Surfaces shown as white pills at the foot of each ambition copy card */
 export const prologueSurfaces = ["App", "Web", "AI"] as const;
 
+/**
+ * 01 = the industry problem Renaker faced · 02 = what Renaker Life unlocked.
+ * Start CTA follows as the Aiyla/start beat.
+ */
 export const prologueAmbitions: PrologueAmbition[] = [
   {
-    id: "resident",
+    id: "problem",
     index: "01",
-    label: "Resident Experience",
-    shortLabel: "Residents",
-    headline: "Make living effortless.",
-    body: "Everything residents need in one place — answers, requests, communication, community and everyday services.",
-    tags: ["AI Concierge", "Requests", "Community", "Services"],
+    label: "The Challenge",
+    shortLabel: "Challenge",
+    headline: "Traditional systems were failing everyone.",
+    body: "Resident engagement was low. Teams worked across dozens of disconnected systems and manual processes. Management lacked one clear view across the estate, and AI had no practical role in day-to-day operations.",
+    tags: ["Fragmented tools", "Low engagement", "Teams frustrated", "No AI"],
   },
   {
-    id: "operations",
+    id: "solution",
     index: "02",
-    label: "Building Operations",
-    shortLabel: "Operations",
-    headline: "Run buildings better.",
-    body: "One connected workspace for concierge and building teams to manage the day-to-day operation of every development.",
-    tags: ["Tasks", "Parcels", "Requests", "Communications", "Automation"],
-  },
-  {
-    id: "management",
-    index: "03",
-    label: "Management Intelligence",
-    shortLabel: "Management",
-    headline: "Turn activity into intelligence.",
-    body: "Unlock and visualise what is happening across the estate — compare developments, identify trends and interrogate operational data.",
-    tags: ["Portfolio View", "Reporting", "Comparison", "AI Insight"],
-  },
-  {
-    id: "city",
-    index: "04",
-    label: "Placemaking",
-    shortLabel: "Placemaking",
-    headline: "Connect home to Manchester.",
-    body: "Extend the resident experience beyond the building — into local businesses, culture, services and the neighbourhood around them.",
-    tags: ["Digital High Street", "Local Discovery", "Services", "Placemaking"],
+    label: "The Platform",
+    shortLabel: "Platform",
+    headline: "One operating system. Every layer of the estate.",
+    body: "One connected platform delivered across resident, operational and management experiences — with Aiyla AI working across them all.",
+    tags: [],
+    result: {
+      title: "A complete estate-wide transformation in three months.",
+      body: "Renaker replaced its incumbent platform and migrated resident, operational and management workflows to Aiyla.",
+    },
   },
 ];
 
 export const prologueAiyla = {
   poweredBy: "Powered by Aiyla",
-  body: "One intelligence layer connecting residents, operations, management and the city around them.",
+  body: "The intelligence behind Renaker Life — answering residents, supporting teams and connecting the estate to the city.",
 };
 
 export const prologueStart = {

@@ -840,11 +840,25 @@ export function PrologueExperience() {
                           {ambition.headline}
                         </h3>
                         <p className="prologue__body mt-5">{ambition.body}</p>
-                        <ul className="prologue__tags">
-                          {ambition.tags.map((tag) => (
-                            <li key={tag}>{tag}</li>
-                          ))}
-                        </ul>
+                        {ambition.result ? (
+                          <div className="prologue__result">
+                            <span className="prologue__result-dot" aria-hidden />
+                            <div className="prologue__result-copy">
+                              <p className="prologue__result-title">
+                                {ambition.result.title}
+                              </p>
+                              <p className="prologue__result-body">
+                                {ambition.result.body}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <ul className="prologue__tags">
+                            {ambition.tags.map((tag) => (
+                              <li key={tag}>{tag}</li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                       <ul className="prologue__pills" aria-label="Surfaces">
                         {prologueSurfaces.map((surface) => (

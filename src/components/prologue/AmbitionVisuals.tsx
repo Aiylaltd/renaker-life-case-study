@@ -263,6 +263,128 @@ function CityVisual({ active }: { active: boolean }) {
   );
 }
 
+function ProblemVisual({ active }: { active: boolean }) {
+  const on = useOnceActive(active);
+
+  const layers = [
+    {
+      role: "Systems",
+      line: "Dozens of disconnected tools and processes",
+      meta: "Before",
+    },
+    {
+      role: "Residents",
+      line: "Low engagement with their previous building system",
+      meta: "Before",
+    },
+    {
+      role: "Teams",
+      line: "Staff who didn’t like using the tools",
+      meta: "Before",
+    },
+    {
+      role: "AI",
+      line: "Rich data, but no practical intelligence layer",
+      meta: "Before",
+    },
+  ];
+
+  return (
+    <div className="prologue-platform" aria-label="The challenge before Renaker Life">
+      <div className="prologue-platform__head">
+        <p className="prologue-dash__label">Before Renaker Life</p>
+        <p className="prologue-platform__tagline">
+          Traditional systems left everyone behind.
+        </p>
+      </div>
+
+      <ul className="prologue-platform__layers">
+        {layers.map((layer, i) => (
+          <li
+            key={layer.role}
+            className={`prologue-platform__card ${on ? "is-on" : ""}`}
+            style={{ transitionDelay: on ? `${i * 90}ms` : "0ms" }}
+          >
+            <div className="prologue-platform__row">
+              <p className="prologue-platform__role">{layer.role}</p>
+              <p className="prologue-platform__meta">{layer.meta}</p>
+            </div>
+            <p className="prologue-platform__line">{layer.line}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SolutionVisual({ active }: { active: boolean }) {
+  const on = useOnceActive(active);
+
+  const layers = [
+    {
+      role: "Residents",
+      line: "AI concierge, bookings, requests, community and services.",
+      meta: "Living",
+    },
+    {
+      role: "Building Teams",
+      line: "Front-of-house, tasks, communications, compliance and workflows.",
+      meta: "Operations",
+    },
+    {
+      role: "Management",
+      line: "Portfolio control, reporting, deep insight and estate-wide intelligence.",
+      meta: "Intelligence",
+    },
+  ];
+
+  const aiLayer = {
+    role: "Aiyla AI",
+    line: "Answering, automating, analysing and acting across resident, operational and estate data — 24/7 in 200+ languages.",
+    meta: "Across every layer",
+  };
+
+  return (
+    <div
+      className="prologue-platform prologue-platform--solution"
+      aria-label="Renaker Life for residents, building teams, management and Aiyla AI"
+    >
+      <div className="prologue-platform__head">
+        <p className="prologue-dash__label">Renaker Life</p>
+        <p className="prologue-platform__tagline">
+          One operating system. Every layer of the estate.
+        </p>
+      </div>
+
+      <ul className="prologue-platform__layers">
+        {layers.map((layer, i) => (
+          <li
+            key={layer.role}
+            className={`prologue-platform__card ${on ? "is-on" : ""}`}
+            style={{ transitionDelay: on ? `${i * 100}ms` : "0ms" }}
+          >
+            <div className="prologue-platform__row">
+              <p className="prologue-platform__role">{layer.role}</p>
+              <p className="prologue-platform__meta">{layer.meta}</p>
+            </div>
+            <p className="prologue-platform__line">{layer.line}</p>
+          </li>
+        ))}
+        <li
+          className={`prologue-platform__card prologue-platform__card--ai ${on ? "is-on" : ""}`}
+          style={{ transitionDelay: on ? `${layers.length * 100}ms` : "0ms" }}
+        >
+          <div className="prologue-platform__row">
+            <p className="prologue-platform__role">{aiLayer.role}</p>
+            <p className="prologue-platform__meta">{aiLayer.meta}</p>
+          </div>
+          <p className="prologue-platform__line">{aiLayer.line}</p>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
 export function AmbitionVisual({
   id,
   active,
@@ -271,13 +393,9 @@ export function AmbitionVisual({
   active: boolean;
 }) {
   switch (id) {
-    case "resident":
-      return <ResidentVisual active={active} />;
-    case "operations":
-      return <OperationsVisual active={active} />;
-    case "management":
-      return <ManagementVisual active={active} />;
-    case "city":
-      return <CityVisual active={active} />;
+    case "problem":
+      return <ProblemVisual active={active} />;
+    case "solution":
+      return <SolutionVisual active={active} />;
   }
 }
