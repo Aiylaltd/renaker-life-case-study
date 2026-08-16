@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   estateTourDevelopments,
   developments,
@@ -49,8 +49,10 @@ export function TowerDevelopmentStack({
 }) {
   const feed = chapter.liveActivity;
   const [cursor, setCursor] = useState(0);
+  const featurePanelRef = useRef<HTMLDivElement>(null);
   const { image, imageAlt } = resolveDevelopmentImage(chapter);
   const isOutcome = state.kind === "outcome";
+  const isAdmin = chapter.audience === "admin";
   const label = state.label ?? chapter.chapterLabel;
 
   useEffect(() => {
@@ -62,19 +64,28 @@ export function TowerDevelopmentStack({
     return () => window.clearInterval(id);
   }, [profileVisible, chapter.id, feed.length]);
 
+  // Community (and other tall states) can leave the panel scrolled down —
+  // reset so short outcome cards aren't sitting above the fold.
+  useEffect(() => {
+    const panel = featurePanelRef.current;
+    if (panel) panel.scrollTop = 0;
+  }, [state.id, featureVisible]);
+
   const activity = feed[cursor % feed.length];
 
   return (
     <div
       className={`tower-stack tower-stack--${side} ${
         profileVisible ? "tower-stack--in" : "tower-stack--out"
-      } ${featureVisible ? "tower-stack--expanded" : ""}`}
+      } ${featureVisible ? "tower-stack--expanded" : ""} ${
+        isOutcome ? "tower-stack--outcome" : ""
+      } ${isAdmin ? "tower-stack--admin" : "tower-stack--resident"}`}
       aria-hidden={!profileVisible}
       aria-label={`${chapter.name} case study`}
     >
       <div className="tower-stack__shell">
         <div className="tower-stack__feature-wrap" aria-hidden={!featureVisible}>
-          <div className="tower-stack__feature">
+          <div className="tower-stack__feature" ref={featurePanelRef}>
             <div key={state.id} className="tower-feature__inner">
               {label && !isOutcome ? (
                 <p className="tower-feature__label">{label}</p>
@@ -85,7 +96,11 @@ export function TowerDevelopmentStack({
               {state.supporting && !isOutcome ? (
                 <p className="tower-feature__supporting">{state.supporting}</p>
               ) : null}
-              <div className="tower-feature__body">
+              <div
+                className={`tower-feature__body ${
+                  isOutcome ? "tower-feature__body--outcome" : ""
+                }`}
+              >
                 <FeatureStateViews state={state} />
               </div>
             </div>

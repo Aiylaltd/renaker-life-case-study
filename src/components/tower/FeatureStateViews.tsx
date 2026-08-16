@@ -1,6 +1,7 @@
 "use client";
 
 import type { FeatureState } from "@/config/towerChapters";
+import { LivingHomeGallery } from "@/components/tower/LivingHomeGallery";
 
 function ChatBlock({
   lines,
@@ -84,9 +85,119 @@ export function FeatureStateViews({ state }: { state: FeatureState }) {
               </div>
             ))}
           </div>
+          {state.journeySteps?.length ? (
+            <ol className="tower-journey tower-journey--inline" aria-label="Booking steps">
+              {state.journeySteps.map((step, i) => (
+                <li key={step} className="tower-journey__step">
+                  <span className="tower-journey__index">{i + 1}</span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          ) : null}
         </div>
       );
     }
+
+    case "moments":
+      return (
+        <ul className="tower-moments" aria-label="Product moments">
+          {(state.moments ?? []).map((moment, i) => (
+            <li
+              key={`${moment.title}-${i}`}
+              className="tower-moments__card"
+              style={{ ["--i" as string]: i }}
+            >
+              {moment.meta ? (
+                <p className="tower-moments__meta">{moment.meta}</p>
+              ) : null}
+              <p className="tower-moments__title">{moment.title}</p>
+              <p className="tower-moments__detail">{moment.detail}</p>
+            </li>
+          ))}
+        </ul>
+      );
+
+    case "living-home":
+      return <LivingHomeGallery />;
+
+    case "community-feed":
+      return (
+        <div className="tower-community" aria-label="Resident community">
+          <div className="tower-community__feed">
+            <article
+              className="tower-community__item tower-community__item--post"
+              style={{ ["--i" as string]: 0 }}
+            >
+              <div className="tower-community__who">
+                <span className="tower-community__avatar" aria-hidden>
+                  M
+                </span>
+                <div>
+                  <p className="tower-community__name">Michael · Three60</p>
+                  <p className="tower-community__time">2h ago · Neighbour post</p>
+                </div>
+              </div>
+              <p className="tower-community__body">
+                Anyone have a spare drill for an hour this evening?
+              </p>
+              <div className="tower-community__reply">
+                <span
+                  className="tower-community__avatar tower-community__avatar--sm"
+                  aria-hidden
+                >
+                  J
+                </span>
+                <div>
+                  <p className="tower-community__name">Jess · 42B</p>
+                  <p className="tower-community__body">
+                    Happy to lend mine — drop by after 6.
+                  </p>
+                </div>
+              </div>
+            </article>
+
+            <article
+              className="tower-community__item tower-community__item--market"
+              style={{ ["--i" as string]: 1 }}
+            >
+              <p className="tower-community__chip">Marketplace</p>
+              <div className="tower-community__market-row">
+                <div className="tower-community__market-media" aria-hidden />
+                <div>
+                  <p className="tower-community__market-title">Dining table</p>
+                  <p className="tower-community__market-price">£120</p>
+                  <p className="tower-community__market-detail">
+                    Resident · Collection tonight
+                  </p>
+                </div>
+              </div>
+            </article>
+
+            <article
+              className="tower-community__item tower-community__item--event"
+              style={{ ["--i" as string]: 2 }}
+            >
+              <p className="tower-community__chip">Event</p>
+              <p className="tower-community__event-title">Roof garden meetup</p>
+              <p className="tower-community__event-detail">
+                8 going · This evening · Three60 terrace
+              </p>
+            </article>
+
+            <article
+              className="tower-community__item tower-community__item--notice"
+              style={{ ["--i" as string]: 3 }}
+            >
+              <p className="tower-community__chip">Building</p>
+              <p className="tower-community__body">
+                Lift 2 maintenance tomorrow, 10:00–12:00. Please use Lift 1.
+              </p>
+              <p className="tower-community__time">Announcement · Just now</p>
+            </article>
+          </div>
+        </div>
+      );
 
     case "journey":
       return (
@@ -141,10 +252,15 @@ export function FeatureStateViews({ state }: { state: FeatureState }) {
               <span aria-hidden>{state.human.name.slice(0, 1)}</span>
             )}
           </div>
+          {state.human.caption ? (
+            <p className="tower-human__caption">{state.human.caption}</p>
+          ) : null}
           <div className="tower-human__copy">
             <p className="tower-human__name">{state.human.name}</p>
             <p className="tower-human__value">{state.human.value}</p>
-            <p className="tower-human__detail">{state.human.detail}</p>
+            {state.human.detail ? (
+              <p className="tower-human__detail">{state.human.detail}</p>
+            ) : null}
           </div>
         </div>
       );
@@ -275,7 +391,13 @@ export function FeatureStateViews({ state }: { state: FeatureState }) {
           {state.outcomeValue ? (
             <p className="tower-outcome__value">{state.outcomeValue}</p>
           ) : null}
-          <p className="tower-outcome__label">{state.outcomeLabel}</p>
+          <p
+            className={`tower-outcome__label ${
+              state.outcomeNote ? "tower-outcome__label--eyebrow" : ""
+            }`}
+          >
+            {state.outcomeLabel}
+          </p>
           {state.outcomeNote ? (
             <p className="tower-feature__note">{state.outcomeNote}</p>
           ) : null}

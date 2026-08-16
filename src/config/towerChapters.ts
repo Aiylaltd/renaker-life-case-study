@@ -22,7 +22,10 @@ export type FeatureStateKind =
   | "comms"
   | "consolidate"
   | "outcome"
-  | "management";
+  | "management"
+  | "moments"
+  | "living-home"
+  | "community-feed";
 
 export interface LiveActivityExample {
   /** Illustrative UI copy — not live telemetry */
@@ -32,6 +35,12 @@ export interface LiveActivityExample {
 export interface ChatLine {
   role: "resident" | "ai";
   text: string;
+}
+
+export interface FeatureMoment {
+  title: string;
+  detail: string;
+  meta?: string;
 }
 
 export interface FeatureState {
@@ -50,12 +59,16 @@ export interface FeatureState {
   brandLogo?: string;
   brandLogoAlt?: string;
   journeySteps?: string[];
+  /** Compact UI moment cards (utility / community) */
+  moments?: FeatureMoment[];
   human?: {
     name: string;
     value: string;
     detail: string;
     image?: string;
     imageAlt?: string;
+    /** Short line under the portrait */
+    caption?: string;
   };
   opsSteps?: string[];
   opsPrompt?: string;
@@ -86,6 +99,11 @@ export interface TowerChapter {
   profileImageAlt?: string;
   profileSide: CardSide;
   featureSide: CardSide;
+  /**
+   * Resident chapters stay light; admin/staff chapters use dark surfaces.
+   * Defaults to resident.
+   */
+  audience?: "resident" | "admin";
   /** Illustrative activity examples — not live production events */
   liveActivity: LiveActivityExample[];
   chapterLabel: string;
@@ -182,24 +200,72 @@ export const towerChapters: TowerChapter[] = [
     profileSide: "left",
     featureSide: "left",
     liveActivity: [
+      { text: "Amenity booked" },
+      { text: "Parcel ready for collection" },
+      { text: "Community post replied" },
+      { text: "Marketplace listing live" },
+      { text: "Building notice delivered" },
+    ],
+    chapterLabel: "Resident Life",
+    navTitle: "Resident Life",
+    featureStates: [
+      {
+        id: "living-utility",
+        kind: "living-home",
+        label: "Everyday Living",
+        headline: "Everything Residents need, one place.",
+      },
+      {
+        id: "living-community",
+        kind: "community-feed",
+        label: "Community",
+        headline: "Neighbours, connected.",
+      },
+      {
+        id: "living-outcome",
+        kind: "outcome",
+        outcomeValue: "1.3★ → 4.4★",
+        outcomeLabel: "App Store rating",
+        outcomeNote:
+          "Resident sentiment transformed following the launch of Renaker Life.",
+        verified: true,
+      },
+    ],
+  },
+  {
+    id: "crown-doorly",
+    anchor: "ANCHOR_CROWNST",
+    developmentId: "crown-street",
+    name: "Crown Street",
+    location: "Manchester",
+    homes: "664 homes",
+    statusLine: "Live on Renaker Life",
+    profileSide: "left",
+    featureSide: "left",
+    liveActivity: [
       { text: "Service booked" },
       { text: "Provider confirmed" },
       { text: "Resident notified" },
-      { text: "Amenity booking confirmed" },
-      { text: "Event registration completed" },
+      { text: "Local booking completed" },
     ],
     chapterLabel: "Resident Services",
-    navTitle: "Resident Services",
+    navTitle: "Doorly",
     featureStates: [
       {
         id: "services-discover",
         kind: "services",
         label: "Resident Services",
-        headline: "Resident Services\nby Doorly",
+        headline: "Resident Services by Doorly",
         supporting:
-          "Renaker Life connects residents directly to trusted, local service providers. Making booking a cleaner as easy as ordering an Uber.",
+          "Beyond the building — trusted local providers on demand, while generating new revenue for the developer through Doorly.",
         brandLogo: "/images/doorly/doorly-logo-full.png",
         brandLogoAlt: "Doorly",
+        journeySteps: [
+          "Choose service",
+          "Choose provider",
+          "Book",
+          "Confirmation",
+        ],
         serviceTiles: [
           { label: "Cleaning", image: "/images/doorly/services/cleaning.jpg" },
           { label: "Beauty", image: "/images/doorly/services/beauty.jpg" },
@@ -215,56 +281,43 @@ export const towerChapters: TowerChapter[] = [
         ],
       },
       {
-        id: "services-journey",
-        kind: "journey",
-        label: "Resident Services",
-        headline: "Booked in moments.",
-        supporting: "From discovery to confirmation — one clear path.",
-        brandLogo: "/images/doorly/doorly-logo-full.png",
-        brandLogoAlt: "Doorly",
-        journeySteps: [
-          "Choose service",
-          "Choose provider",
-          "Book",
-          "Confirmation",
-        ],
-      },
-      {
         id: "services-george",
         kind: "human",
         label: "Resident Services",
-        headline: "Local demand.\nReal income.",
+        headline: "Local demand. Real income.",
         brandLogo: "/images/doorly/doorly-logo-full.png",
         brandLogoAlt: "Doorly",
         human: {
           name: "Michael & George",
           value: georgeProof.value,
-          detail:
-            "Driving revenue into the local economy with top earners generating over £50,000 per year in bookings.",
+          detail: "",
           image: "/images/doorly/george.jpg",
           imageAlt: "Michael and George — Doorly local providers",
+          caption:
+            "Leading Doorly providers earning over £50k p/a in bookings",
         },
       },
       {
         id: "services-outcome",
         kind: "outcome",
-        outcomeValue: "",
-        outcomeLabel:
-          "Providing work for local providers, increasing resident experience and generating new revenue for developments through the Doorly revenue share scheme.",
-        verified: true,
+        outcomeValue: "6,000+",
+        outcomeLabel: "Resident services booked",
+        outcomeNote:
+          "With new revenue generation for developments through revenue share.",
       },
     ],
   },
   {
-    id: "crown-operations",
-    anchor: "ANCHOR_CROWNST",
-    developmentId: "crown-street",
-    name: "Crown Street",
+    id: "castle-operations",
+    anchor: "ANCHOR_CW",
+    developmentId: "castle-wharf",
+    name: "Castle Wharf",
     location: "Manchester",
-    homes: "664 homes",
+    homes: "188 homes",
     statusLine: "Live on Renaker Life",
     profileSide: "left",
     featureSide: "left",
+    audience: "admin",
     liveActivity: [
       { text: "Request categorised" },
       { text: "Task created" },
@@ -312,73 +365,9 @@ export const towerChapters: TowerChapter[] = [
       {
         id: "ops-outcome",
         kind: "outcome",
-        // Qualitative close — numeric "24,000+" held in pendingMetrics until verified
         outcomeValue: "Handled.",
         outcomeLabel:
           "Requests categorised, tasks created, teams notified — without the admin bottleneck.",
-        verified: true,
-      },
-    ],
-  },
-  {
-    id: "castle-platform",
-    anchor: "ANCHOR_CW",
-    developmentId: "castle-wharf",
-    name: "Castle Wharf",
-    location: "Manchester",
-    homes: "188 homes",
-    statusLine: "Live on Renaker Life",
-    profileSide: "left",
-    featureSide: "left",
-    liveActivity: [
-      { text: "Parcel processed" },
-      { text: "Move-in journey started" },
-      { text: "Room booking confirmed" },
-      { text: "Task completed" },
-    ],
-    chapterLabel: "One Operating System",
-    navTitle: "One Platform",
-    featureStates: [
-      {
-        id: "platform-fragment",
-        kind: "consolidate",
-        label: "One Operating System",
-        headline: "From fragmented systems\nto one connected platform.",
-        supporting:
-          "Resident and building operations brought together in one place.",
-        functions: [
-          "Parcels",
-          "Move-ins",
-          "Service requests",
-          "Room bookings",
-          "Event bookings",
-          "Communications",
-          "Tasks",
-          "Resident information",
-        ],
-      },
-      {
-        id: "platform-unified",
-        kind: "consolidate",
-        label: "One Operating System",
-        headline: "One connected\nplatform.",
-        supporting: "Residents. Operations. Management.",
-        functions: [
-          "Parcels",
-          "Move-ins",
-          "Service requests",
-          "Room bookings",
-          "Event bookings",
-          "Communications",
-          "Tasks",
-          "Resident information",
-        ],
-      },
-      {
-        id: "platform-outcome",
-        kind: "outcome",
-        outcomeValue: "One",
-        outcomeLabel: "connected operating environment for the building.",
         verified: true,
       },
     ],
@@ -395,6 +384,7 @@ export const towerChapters: TowerChapter[] = [
     profileImageAlt: "Renaker developments across Manchester",
     profileSide: "left",
     featureSide: "left",
+    audience: "admin",
     liveActivity: [
       { text: "Estate report generated" },
       { text: "Development comparison ready" },
@@ -546,32 +536,32 @@ export function resolveChapterTiming(
       cameraCalm: true,
     };
   }
-  if (t < 0.82) {
-    // Feature states after profile; outcome held toward end of this band
-    const featureSpan = (t - profileEnd) / (0.82 - profileEnd);
+  if (t < 0.88) {
+    // Feature states after profile; last state held toward end of this band
+    const featureSpan = (t - profileEnd) / (0.88 - profileEnd);
     return {
-      phase: featureSpan > 0.85 ? "outcome" : "feature",
+      phase: featureSpan > 0.82 ? "outcome" : "feature",
       profileVisible: true,
       featureVisible: true,
       featureStateIndex: featureSpan,
       cameraCalm: true,
     };
   }
-  if (t < 0.9) {
+  if (t < 0.94) {
     return {
       phase: "clearing",
       profileVisible: true,
       featureVisible: false,
-      featureStateIndex: 1,
+      featureStateIndex: 0.999,
       cameraCalm: true,
     };
   }
-  if (t < 0.96) {
+  if (t < 0.97) {
     return {
       phase: "clearing",
       profileVisible: false,
       featureVisible: false,
-      featureStateIndex: 1,
+      featureStateIndex: 0.999,
       cameraCalm: false,
     };
   }
@@ -579,7 +569,7 @@ export function resolveChapterTiming(
     phase: "depart",
     profileVisible: false,
     featureVisible: false,
-    featureStateIndex: 1,
+    featureStateIndex: 0.999,
     cameraCalm: false,
   };
 }
