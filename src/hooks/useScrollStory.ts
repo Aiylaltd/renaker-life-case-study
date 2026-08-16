@@ -512,10 +512,9 @@ export function useScrollStory(enabled: boolean) {
     watch("section-finale", "finale", (p) => {
       setSceneMode("finale");
       setAttentionMode("cinematic");
-      // Snap quickly so the slide doesn't flicker through mid-opacity states
-      const settle = Math.min(1, p * 2.4);
-      setHaze(settle);
-      setOrbReveal(settle);
+      // Ease over the city first; black + orb content arrive mid/late scroll
+      setHaze(Math.min(1, p * 1.05));
+      setOrbReveal(Math.max(0, (p - 0.22) * 1.35));
       setDhsIntensity(0);
       setTrsreIntensity(0);
       setDoorlyIntensity(0);

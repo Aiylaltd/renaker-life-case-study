@@ -8,11 +8,19 @@ import { useScrollStore } from "@/store/scrollStore";
 
 export function FinaleSection() {
   const sectionId = useScrollStore((s) => s.sectionId);
+  const haze = useScrollStore((s) => s.haze);
   const orb = useScrollStore((s) => s.orbReveal);
   const year = new Date().getFullYear();
 
-  // Latch once — avoid scroll-tied opacity that flickers mid-section
-  const inFinale = sectionId === "finale" && orb > 0.08;
+  const inFinale = sectionId === "finale";
+  // City first, then black eases in — never fully opaque so Manchester stays under
+  const blackOpacity = inFinale
+    ? Math.min(0.86, Math.max(0, (haze - 0.08) * 1.05))
+    : 0;
+  const showContent = inFinale && orb > 0.28;
+  const contentOpacity = showContent
+    ? Math.min(1, (orb - 0.28) / 0.4)
+    : 0;
 
   return (
     <section
@@ -20,15 +28,22 @@ export function FinaleSection() {
       className={`story-section--finale ${inFinale ? "is-active" : ""}`}
       aria-labelledby="finale-heading"
     >
-      <div className="finale-blackout" aria-hidden />
+      <div
+        className="finale-blackout"
+        style={{ opacity: blackOpacity }}
+        aria-hidden
+      />
 
       <div className="finale-stage">
-        <div className={`finale-content ${inFinale ? "is-on" : ""}`}>
+        <div
+          className={`finale-content ${showContent ? "is-on" : ""}`}
+          style={{ opacity: contentOpacity }}
+        >
           <div className="finale-logo">
             <RenakerLifeLogo variant="light" />
           </div>
 
-          <FinaleLiquidOrb active={inFinale} />
+          <FinaleLiquidOrb active={showContent} />
 
           <h2 id="finale-heading" className="finale-line">
             {sections.finale.line}

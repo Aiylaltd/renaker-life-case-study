@@ -35,18 +35,14 @@ export function SceneCanvas() {
   const experienceStarted = useScrollStore((s) => s.experienceStarted);
   const loaderDone = useScrollStore((s) => s.loaderDone);
   const sectionId = useScrollStore((s) => s.sectionId);
-  const haze = useScrollStore((s) => s.haze);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   // Render while the loading screen covers the canvas so city + towers upload
   // to the GPU before the user ever sees the 3D view.
   const warmScene = !loaderDone || experienceStarted;
-  // Pause the city under editorial video playback and finale — GPU fights
-  // video decode on Mac and shows up as frame flicker.
-  const editorialHold =
-    (sectionId === "videos" || sectionId === "finale") &&
-    (sectionId !== "finale" || haze > 0.5);
+  // Pause city under videos; keep it alive under a translucent finale veil
+  const editorialHold = sectionId === "videos";
   const runScene = warmScene && !editorialHold;
 
   useEffect(() => {

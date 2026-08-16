@@ -79,7 +79,7 @@ export const trsreProof = {
   stepsLabel: "steps in a single day",
   quote:
     "I've discovered more about Manchester today than in three years of living here.",
-  quoteNote: "Real resident feedback from a TRSRE hunt.",
+  quoteNote: "Real resident feedback from a TRSRE player.",
 };
 
 /**

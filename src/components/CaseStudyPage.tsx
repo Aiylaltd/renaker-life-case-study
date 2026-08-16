@@ -26,11 +26,8 @@ export function CaseStudyPage() {
   useScrollStory(experienceStarted);
   useTowerTourSteps(experienceStarted);
 
-  // Keep nav through the story so chapter skip stays available past the tower tour.
-  const showCaseNav =
-    experienceStarted &&
-    sectionId !== "loader" &&
-    sectionId !== "finale";
+  // Keep nav through Videos + finale (Contact highlight)
+  const showCaseNav = experienceStarted && sectionId !== "loader";
 
   return (
     <>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { VideoStoryConfig } from "@/config/videos";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 
@@ -16,20 +16,47 @@ export function VideoStory({
   const videoRef = useRef<HTMLVideoElement>(null);
   const activeRef = useRef(active);
   activeRef.current = active;
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
     if (active) return;
 
-    // Debounce pause so brief active blips don’t hitch playback
     const t = window.setTimeout(() => {
       if (!activeRef.current) {
         videoRef.current?.pause();
+        setPlaying(false);
       }
     }, 200);
     return () => window.clearTimeout(t);
   }, [active]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onEnded = () => setPlaying(false);
+
+    el.addEventListener("play", onPlay);
+    el.addEventListener("pause", onPause);
+    el.addEventListener("ended", onEnded);
+    return () => {
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("pause", onPause);
+      el.removeEventListener("ended", onEnded);
+    };
+  }, [story.src]);
+
+  const playVideo = () => {
+    const el = videoRef.current;
+    if (!el) return;
+    void el.play().catch(() => {
+      /* autoplay / gesture policies */
+    });
+  };
 
   return (
     <article
@@ -53,7 +80,7 @@ export function VideoStory({
           >
             <video
               ref={videoRef}
-              controls
+              controls={playing}
               playsInline
               preload={active || upcoming ? "metadata" : "none"}
               poster={story.poster}
@@ -61,6 +88,17 @@ export function VideoStory({
             >
               <source src={story.src} type="video/mp4" />
             </video>
+            <button
+              type="button"
+              className={`video-card__play-overlay ${playing ? "is-playing" : ""}`}
+              onClick={playVideo}
+              aria-label={`Play ${story.posterLabel}`}
+              tabIndex={active ? 0 : -1}
+            >
+              <span className="video-card__play" aria-hidden>
+                ▶
+              </span>
+            </button>
           </div>
         ) : story.poster ? (
           <div
@@ -73,6 +111,9 @@ export function VideoStory({
               alt=""
               className="h-full w-full object-cover"
             />
+            <div className="video-card__play-overlay" aria-hidden>
+              <span className="video-card__play">▶</span>
+            </div>
           </div>
         ) : (
           <div

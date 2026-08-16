@@ -1,6 +1,6 @@
 export const trsreCopy = {
   introLabel: "TRSRE",
-  introHeadline: "Gamified Local Area Exploration",
+  introHeadline: "Engagement Through Gamification",
   introBody:
     "For demographics young and old, we deployed TRSRE. A real world interactive treasure hunt hidden around Manchester and beyond.",
   codesLabel: "TRSRE",
@@ -11,7 +11,7 @@ export const trsreCopy = {
   supporting:
     "An interactive TRSRE hunt with 300+ codes hidden around Manchester — so younger residents explore their city, engage with real places, and win prizes.",
   mapLine:
-    "Thousands of residents compete to find as many treasure hunts as possible in the allotted time. With top players completing over 30,000 steps and hundreds of hunts, discovering new parts of the area and beyond.",
+    "Thousands of residents compete to find as many treasure hunts as possible in the allotted time. With top players completing over 30,000 steps and hundreds of hunts, discovering new parts for the area and dramatically boosting resident engagement.",
   contrastNote:
     "A deliberate contrast between the digital map and real people experiencing Manchester.",
 };
