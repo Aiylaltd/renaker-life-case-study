@@ -52,7 +52,14 @@ interface ScrollState {
   towerBeatIndex: number;
   /** When true, wheel is charged per-beat (prologue-style) instead of free scroll */
   towerTourStepped: boolean;
+  /**
+   * Post-management bridge: “Beyond the buildings” holds on the estate frame
+   * before the camera drops into the Digital High Street city view.
+   */
+  storyBridge: "none" | "beyond";
   activeBusinesses: AnchorName[];
+  /** Beat 4 — scatter purple pulses across the city while queries list */
+  dhsVisionPulse: boolean;
   cityAwake: number;
   dhsIntensity: number;
   trsreIntensity: number;
@@ -93,7 +100,9 @@ interface ScrollState {
   ) => void;
   setTowerCameraSettled: (v: boolean) => void;
   setTowerTourStepped: (v: boolean) => void;
+  setStoryBridge: (v: ScrollState["storyBridge"]) => void;
   setActiveBusinesses: (a: AnchorName[]) => void;
+  setDhsVisionPulse: (v: boolean) => void;
   setCityAwake: (v: number) => void;
   setDhsIntensity: (v: number) => void;
   setTrsreIntensity: (v: number) => void;
@@ -131,7 +140,9 @@ export const useScrollStore = create<ScrollState>((set) => ({
   towerFeatureStateIndex: 0,
   towerBeatIndex: 0,
   towerTourStepped: false,
+  storyBridge: "none",
   activeBusinesses: [],
+  dhsVisionPulse: false,
   cityAwake: 0,
   dhsIntensity: 0,
   trsreIntensity: 0,
@@ -159,7 +170,9 @@ export const useScrollStore = create<ScrollState>((set) => ({
   setTowerJourney: (partial) => set(partial),
   setTowerCameraSettled: (towerCameraSettled) => set({ towerCameraSettled }),
   setTowerTourStepped: (towerTourStepped) => set({ towerTourStepped }),
+  setStoryBridge: (storyBridge) => set({ storyBridge }),
   setActiveBusinesses: (activeBusinesses) => set({ activeBusinesses }),
+  setDhsVisionPulse: (dhsVisionPulse) => set({ dhsVisionPulse }),
   setCityAwake: (cityAwake) => set({ cityAwake }),
   setDhsIntensity: (dhsIntensity) => set({ dhsIntensity }),
   setTrsreIntensity: (trsreIntensity) => set({ trsreIntensity }),

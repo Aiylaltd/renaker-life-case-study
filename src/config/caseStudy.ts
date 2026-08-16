@@ -82,18 +82,18 @@ export const sections = {
   beyond: {
     id: "beyond",
     headline: "Beyond the buildings.",
-    supporting: "Connecting residents with the local area.",
+    supporting: "Connecting residents to the city around them.",
   },
   dhsEarly: {
     id: "dhs-early",
     bridge: "Life doesn't stop at the front door.",
-    headline: "Digital High Street",
-    rewardsLine: "Renaker Life Rewards",
-    body: "Local bricks-and-mortar businesses build a meaningful digital footprint inside Renaker Life — so residents can discover, engage and redeem nearby.",
+    headline: "Renaker Life Resident Access",
+    rewardsLine: "The Digital High Street",
+    body: "Unlock resident rewards, perks, top picks, discovery and recommendations on the city around you.",
     askHeadline: "Ask your neighbourhood.",
-    businessHeadline: "Seen by the residents next door.",
+    businessHeadline: "Insight and Reach for Local businesses.",
     businessBody:
-      "Local businesses get a clear view of discovery and engagement — so the high street can build a real relationship with the communities around it.",
+      "Providing local businesses access their own profile within Renaker life, creating content and viewing analytics.",
   },
   resident: {
     id: "resident",

@@ -58,7 +58,6 @@ export function useScrollStory(enabled: boolean) {
     (s) => s.setEstateBuildingProgress,
   );
   const setTowerJourney = useScrollStore((s) => s.setTowerJourney);
-  const setActiveBusinesses = useScrollStore((s) => s.setActiveBusinesses);
   const setDhsIntensity = useScrollStore((s) => s.setDhsIntensity);
   const setTrsreIntensity = useScrollStore((s) => s.setTrsreIntensity);
   const setDoorlyIntensity = useScrollStore((s) => s.setDoorlyIntensity);
@@ -353,6 +352,11 @@ export function useScrollStory(enabled: boolean) {
             );
           },
           onLeave: () => {
+            const store = useScrollStore.getState();
+            // Beyond hold sits at the end of the hero — don't collapse the estate frame
+            if (store.storyBridge === "beyond" || store.towerTourStepped) {
+              return;
+            }
             setSceneMode("quiet");
             setActiveDevelopment(null);
             setAttentionMode("editorial");
@@ -366,16 +370,47 @@ export function useScrollStory(enabled: boolean) {
       );
     }
 
-    watch("section-dhs-early", "dhs-early", (p) => {
-      setSceneMode("dhs");
-      setAttentionMode(p < 0.22 ? "cinematic" : "editorial");
-      setDhsIntensity(Math.min(1, Math.max(0.15, p * 1.15)));
-      setActiveBusinesses(["ANCHOR_BIZ1", "ANCHOR_BIZ2", "ANCHOR_BIZ3"]);
-      setActiveDevelopment(null);
-      setCityAwake(0.75);
-      setDoorlyIntensity(0);
-      setTrsreIntensity(0);
-    });
+    // DHS — don't steal while the tower tour / Beyond bridge still owns the story
+    const dhsEl = document.getElementById("section-dhs-early");
+    if (dhsEl) {
+      triggers.push(
+        ScrollTrigger.create({
+          trigger: dhsEl,
+          start: "top center",
+          end: "bottom center",
+          onEnter: () => {
+            const store = useScrollStore.getState();
+            if (store.storyBridge === "beyond" || store.towerTourStepped) return;
+            setSection("dhs-early", 0);
+            setAttentionMode("editorial");
+          },
+          onEnterBack: () => {
+            const store = useScrollStore.getState();
+            if (store.storyBridge === "beyond" || store.towerTourStepped) return;
+            setSection("dhs-early", 0);
+            setAttentionMode("editorial");
+          },
+          onUpdate: (self) => {
+            const store = useScrollStore.getState();
+            if (store.storyBridge === "beyond" || store.towerTourStepped) return;
+            setSection("dhs-early", self.progress);
+            setSceneMode("dhs");
+            // City approach after Beyond — cinematic first, then settle to read
+            setAttentionMode(
+              self.progress < 0.12 ? "cinematic" : "editorial",
+            );
+            setDhsIntensity(
+              Math.min(1, Math.max(0.25, 0.3 + self.progress * 0.85)),
+            );
+            store.setStoryBridge("none");
+            setActiveDevelopment(null);
+            setCityAwake(0.75);
+            setDoorlyIntensity(0);
+            setTrsreIntensity(0);
+          },
+        }),
+      );
+    }
 
     watch("section-trsre", "trsre", (p) => {
       setSceneMode("trsre");
@@ -432,7 +467,6 @@ export function useScrollStory(enabled: boolean) {
     setActiveDevelopment,
     setEstateBuildingProgress,
     setTowerJourney,
-    setActiveBusinesses,
     setDhsIntensity,
     setTrsreIntensity,
     setDoorlyIntensity,

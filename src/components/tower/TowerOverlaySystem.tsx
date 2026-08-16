@@ -26,13 +26,16 @@ export function TowerOverlaySystem() {
   const inTour =
     sectionId === "hero" &&
     (sceneMode === "estate" || sceneMode === "estate-overview");
+  const storyBridge = useScrollStore((s) => s.storyBridge);
 
   const mobile = quality === "mobile" || quality === "reduced";
 
-  const profileVisible = inTour && profileWanted && cameraSettled;
-  const featureVisible = inTour && featureWanted && cameraSettled;
+  const profileVisible =
+    inTour && storyBridge === "none" && profileWanted && cameraSettled;
+  const featureVisible =
+    inTour && storyBridge === "none" && featureWanted && cameraSettled;
 
-  if (!inTour || !state) return null;
+  if (!inTour || storyBridge === "beyond" || !state) return null;
 
   return (
     <div

@@ -6,6 +6,7 @@ import { DemoScrollCue } from "@/components/cover/DemoScrollCue";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { CoverSection } from "@/components/sections/CoverSection";
 import { HeroSection } from "@/components/sections/HeroSection";
+import { BeyondBridgeOverlay } from "@/components/sections/BeyondBridgeOverlay";
 import { DhsEarlySection } from "@/components/sections/DhsEarlySection";
 import { TrsreSection } from "@/components/sections/TrsreSection";
 import { VideosSection } from "@/components/sections/VideosSection";
@@ -42,6 +43,7 @@ export function CaseStudyPage() {
       <PrologueExperience />
       <CoverVeil />
       <DemoScrollCue />
+      <BeyondBridgeOverlay />
       <DebugOverlay />
 
       <main

@@ -63,9 +63,9 @@ export const aiNeighbourhoodDemos = [
   },
 ];
 
-/** Illustrative dashboard metrics — not verified Renaker statistics. */
+/** Illustrative dashboard metrics. */
 export const businessDashboardDemo = {
-  disclaimer: "Illustrative demo data — not verified Renaker statistics.",
+  disclaimer: "Illustrative demo data.",
   metrics: [
     { label: "Profile views", value: "2,840" },
     { label: "Post views", value: "6,120" },

@@ -203,9 +203,24 @@ function compositionForState(): {
     _desiredTarget.set(a.x, 70, a.z);
     lerp = 0.02;
   } else if (mode === "dhs") {
-    _desiredPos.set(120, 220, 420);
-    _desiredTarget.set(0, 20, 80);
-    lerp = state.attentionMode === "editorial" ? 0.01 : 0.018;
+    const focused =
+      state.activeBusinesses.length === 1
+        ? state.activeBusinesses[0]
+        : null;
+    if (focused) {
+      const a = AnchorRegistry.getPosition(focused);
+      // Mid frame: pin readable, city still in view
+      _desiredPos.set(a.x + 95, 125, a.z + 185);
+      _desiredTarget.set(a.x, 16, a.z);
+      lerp = 0.024;
+      fov = 42;
+    } else {
+      // Wide overlook for intro + vision queries beat
+      _desiredPos.set(80, 320, 560);
+      _desiredTarget.set(10, 40, 20);
+      lerp = 0.016;
+      fov = 46;
+    }
   } else if (mode === "doorly") {
     const a = AnchorRegistry.getPosition("ANCHOR_BANKSIDE");
     _desiredPos.set(a.x + 160, 180, a.z + 200);
@@ -247,6 +262,7 @@ export function CameraDirector() {
   const lookVel = useRef(new THREE.Vector3());
   const lastActive = useRef<string | null>(null);
   const lastMode = useRef<string | null>(null);
+  const lastDhsFocus = useRef<string | null>(null);
   const lastSnapNonce = useRef(0);
   const settledHold = useRef(0);
 
@@ -262,6 +278,10 @@ export function CameraDirector() {
       lastSnapNonce.current = state.cameraSnapNonce;
       lastActive.current = active;
       lastMode.current = state.sceneMode;
+      lastDhsFocus.current =
+        state.activeBusinesses.length === 1
+          ? state.activeBusinesses[0]
+          : null;
       camera.position.copy(_desiredPos);
       lookAt.current.copy(_desiredTarget);
       vel.current.set(0, 0, 0);
@@ -287,11 +307,32 @@ export function CameraDirector() {
       lerp = Math.min(lerp, state.sceneMode === "approach" ? 0.018 : 0.024);
     }
 
+    // DHS pin changes — commit toward the focused place
+    const dhsFocus =
+      state.sceneMode === "dhs" && state.activeBusinesses.length === 1
+        ? state.activeBusinesses[0]
+        : state.sceneMode === "dhs"
+          ? "__wide__"
+          : null;
+    if (dhsFocus !== lastDhsFocus.current) {
+      lastDhsFocus.current = dhsFocus;
+      if (state.sceneMode === "dhs" && dhsFocus && dhsFocus !== "__wide__") {
+        lerp = Math.max(lerp, 0.036);
+      }
+    }
+
     if (state.sceneMode !== lastMode.current) {
       const prev = lastMode.current;
       lastMode.current = state.sceneMode;
-      vel.current.set(0, 0, 0);
-      lookVel.current.set(0, 0, 0);
+      if (state.sceneMode === "dhs") {
+        // Arrive in the city, then pin zooms take over
+        vel.current.multiplyScalar(0.25);
+        lookVel.current.multiplyScalar(0.25);
+        lerp = Math.max(lerp, 0.022);
+      } else {
+        vel.current.set(0, 0, 0);
+        lookVel.current.set(0, 0, 0);
+      }
       settledHold.current = 0;
       // Only clear settle when leaving the tour framing — not on every estate tick
       if (
@@ -326,7 +367,7 @@ export function CameraDirector() {
     vel.current.multiplyScalar(0.82);
     camera.position.addScaledVector(vel.current, smooth);
     // Direct blend toward target so we can't spring past the destination
-    camera.position.lerp(_desiredPos, smooth * 0.35);
+    camera.position.lerp(_desiredPos, smooth * 0.4);
 
     lookAt.current.lerp(_desiredTarget, smooth);
     lookVel.current.set(0, 0, 0);

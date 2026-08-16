@@ -85,17 +85,17 @@ function BusinessMarkers({ scale = 1 }: { scale?: number }) {
     <group>
       {BUSINESS_ANCHORS.map((name) => {
         const pos = AnchorRegistry.getPosition(name);
-        const lit = active.includes(name) || intensity > 0.35;
+        const focused = active.length === 1 && active[0] === name;
+        const lit = active.includes(name) || intensity > 0.45;
         return (
-          <mesh
-            key={name}
-            position={[pos.x, 12 * scale, pos.z]}
-          >
-            <sphereGeometry args={[Math.max(0.45, 6 * scale), 16, 16]} />
+          <mesh key={name} position={[pos.x, 12 * scale, pos.z]}>
+            <sphereGeometry
+              args={[Math.max(0.45, (focused ? 9 : 6) * scale), 16, 16]}
+            />
             <meshStandardMaterial
-              color={lit ? "#e8dcc8" : "#d4cfc4"}
-              emissive={lit ? "#f0e6d4" : "#000000"}
-              emissiveIntensity={lit ? 0.85 : 0}
+              color={focused ? "#c4b5fd" : lit ? "#e8dcc8" : "#d4cfc4"}
+              emissive={focused ? "#7c3aed" : lit ? "#f0e6d4" : "#000000"}
+              emissiveIntensity={focused ? 1.8 : lit ? 0.85 : 0}
               roughness={0.35}
             />
           </mesh>

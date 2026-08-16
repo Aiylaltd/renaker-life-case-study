@@ -26,14 +26,41 @@ function heroScrollBounds() {
   if (!hero) return null;
   const top = hero.offsetTop;
   const range = Math.max(1, hero.offsetHeight - window.innerHeight);
-  return { top, range };
+  // Leave the last viewport for the Beyond hold so late tour beats
+  // never sit on the DHS ScrollTrigger boundary.
+  const tourRange = Math.max(1, range - window.innerHeight);
+  return { top, range, tourRange };
 }
 
 function yForBeat(index: number) {
   const bounds = heroScrollBounds();
   if (!bounds) return window.scrollY;
   const t = towerBeats.length <= 1 ? 0 : index / (towerBeats.length - 1);
-  return bounds.top + t * bounds.range;
+  return bounds.top + t * bounds.tourRange;
+}
+
+function yForBeyondBridge() {
+  const bounds = heroScrollBounds();
+  if (!bounds) return window.scrollY;
+  return bounds.top + bounds.range;
+}
+
+/** Tour owns input while on estate beats or the Beyond bridge — even if
+ *  ScrollTrigger briefly labels the section as DHS near the hero bottom. */
+function isTourZone() {
+  const store = useScrollStore.getState();
+  if (store.storyBridge === "beyond") return true;
+  if (
+    store.sectionId === "hero" &&
+    (store.sceneMode === "estate" || store.sceneMode === "estate-overview")
+  ) {
+    return true;
+  }
+  if (!store.towerTourStepped) return false;
+  const hero = document.getElementById("section-hero");
+  if (!hero) return false;
+  const heroBottom = hero.offsetTop + hero.offsetHeight;
+  return window.scrollY + window.innerHeight * 0.35 < heroBottom;
 }
 
 function animateScrollTo(targetY: number, duration = 0.65) {
@@ -136,12 +163,70 @@ export function useTowerTourSteps(enabled: boolean) {
       if (!on) chargeRef.current = 0;
     };
 
+    const enterBeyondBridge = async () => {
+      const store = useScrollStore.getState();
+      store.setStoryBridge("beyond");
+      store.setSection("hero", 1);
+      store.setSceneMode("estate-overview");
+      store.setAttentionMode("editorial");
+      store.setActiveDevelopment(null);
+      store.setTowerJourney({
+        towerProfileVisible: false,
+        towerFeatureVisible: false,
+        towerCameraCalm: true,
+      });
+      store.setDhsIntensity(0);
+      store.setActiveBusinesses([]);
+      // Stay armed so the next charge drops into the city
+      setActive(true);
+      chargeRef.current = 0;
+      busyRef.current = true;
+      await animateScrollTo(yForBeyondBridge(), 0.55);
+      busyRef.current = false;
+    };
+
+    const leaveBeyondToCity = async () => {
+      const store = useScrollStore.getState();
+      store.setStoryBridge("none");
+      setActive(false);
+      busyRef.current = true;
+      chargeRef.current = 0;
+      const dhs = document.getElementById("section-dhs-early");
+      const y = dhs
+        ? dhs.offsetTop + 8
+        : window.scrollY + window.innerHeight;
+      // Kick the city approach as we leave the estate frame
+      store.setSceneMode("dhs");
+      store.setAttentionMode("cinematic");
+      store.setDhsIntensity(0.35);
+      await animateScrollTo(y, 0.95);
+      store.setAttentionMode("editorial");
+      busyRef.current = false;
+    };
+
     const goToBeat = async (next: number) => {
       if (busyRef.current) return;
-      const current = useScrollStore.getState().towerBeatIndex;
+      const store = useScrollStore.getState();
+      const current = store.towerBeatIndex;
+
+      if (store.storyBridge === "beyond") {
+        if (next >= towerBeats.length || next > current) {
+          await leaveBeyondToCity();
+          return;
+        }
+        // Back from Beyond → last management beat
+        store.setStoryBridge("none");
+        busyRef.current = true;
+        chargeRef.current = 0;
+        applyBeat(towerBeats.length - 1);
+        await animateScrollTo(yForBeat(towerBeats.length - 1), 0.65);
+        busyRef.current = false;
+        return;
+      }
 
       if (next < 0) {
         setActive(false);
+        store.setStoryBridge("none");
         const cover = document.getElementById("section-cover");
         const y = cover
           ? cover.offsetTop + cover.offsetHeight * 0.68
@@ -154,15 +239,9 @@ export function useTowerTourSteps(enabled: boolean) {
       }
 
       if (next >= towerBeats.length) {
-        setActive(false);
-        const beyond = document.getElementById("section-dhs-early");
-        const y = beyond
-          ? beyond.offsetTop + 8
-          : window.scrollY + window.innerHeight;
-        busyRef.current = true;
-        await animateScrollTo(y, 0.85);
-        busyRef.current = false;
-        chargeRef.current = 0;
+        // After Management: hold “Beyond the buildings” on the estate frame
+        // before any city dive.
+        await enterBeyondBridge();
         return;
       }
 
@@ -176,6 +255,7 @@ export function useTowerTourSteps(enabled: boolean) {
         return;
       }
 
+      store.setStoryBridge("none");
       busyRef.current = true;
       chargeRef.current = 0;
       applyBeat(next);
@@ -185,10 +265,14 @@ export function useTowerTourSteps(enabled: boolean) {
 
     const armIfNeeded = () => {
       if (activeRef.current) return;
+      if (useScrollStore.getState().storyBridge === "beyond") {
+        setActive(true);
+        return;
+      }
       setActive(true);
       const bounds = heroScrollBounds();
       const p = bounds
-        ? clamp01((window.scrollY - bounds.top) / bounds.range)
+        ? clamp01((window.scrollY - bounds.top) / bounds.tourRange)
         : 0;
       // Entering the tour — always start on the arrival beat, then charge forward
       if (p < 0.12) {
@@ -201,14 +285,10 @@ export function useTowerTourSteps(enabled: boolean) {
     };
 
     const onWheel = (e: WheelEvent) => {
-      const { sectionId, sceneMode, towerCameraSettled, towerBeatIndex } =
+      const { towerCameraSettled, towerBeatIndex, storyBridge } =
         useScrollStore.getState();
 
-      const inHero =
-        sectionId === "hero" &&
-        (sceneMode === "estate" || sceneMode === "estate-overview");
-
-      if (!inHero) {
+      if (!isTourZone()) {
         if (activeRef.current) setActive(false);
         return;
       }
@@ -219,6 +299,7 @@ export function useTowerTourSteps(enabled: boolean) {
 
       const currentBeat = towerBeats[towerBeatIndex];
       if (
+        storyBridge !== "beyond" &&
         currentBeat?.phase === "arrive" &&
         e.deltaY > 0 &&
         !towerCameraSettled
@@ -237,12 +318,9 @@ export function useTowerTourSteps(enabled: boolean) {
     };
 
     const onKey = (e: KeyboardEvent) => {
-      const { sectionId, sceneMode, towerCameraSettled, towerBeatIndex } =
+      const { towerCameraSettled, towerBeatIndex, storyBridge } =
         useScrollStore.getState();
-      const inHero =
-        sectionId === "hero" &&
-        (sceneMode === "estate" || sceneMode === "estate-overview");
-      if (!inHero) return;
+      if (!isTourZone()) return;
 
       if (
         e.key !== "ArrowDown" &&
@@ -261,7 +339,12 @@ export function useTowerTourSteps(enabled: boolean) {
       const forward =
         e.key === "ArrowDown" || e.key === " " || e.key === "PageDown";
       const currentBeat = towerBeats[towerBeatIndex];
-      if (forward && currentBeat?.phase === "arrive" && !towerCameraSettled) {
+      if (
+        storyBridge !== "beyond" &&
+        forward &&
+        currentBeat?.phase === "arrive" &&
+        !towerCameraSettled
+      ) {
         return;
       }
 
@@ -271,13 +354,9 @@ export function useTowerTourSteps(enabled: boolean) {
     };
 
     const syncFromStore = () => {
-      const { sectionId, sceneMode } = useScrollStore.getState();
-      const inHero =
-        sectionId === "hero" &&
-        (sceneMode === "estate" || sceneMode === "estate-overview");
-      if (inHero && !activeRef.current) {
+      if (isTourZone() && !activeRef.current) {
         armIfNeeded();
-      } else if (!inHero && activeRef.current) {
+      } else if (!isTourZone() && activeRef.current) {
         setActive(false);
       }
     };
@@ -290,12 +369,9 @@ export function useTowerTourSteps(enabled: boolean) {
       touchY = e.touches[0]?.clientY ?? 0;
     };
     const onTouchMove = (e: TouchEvent) => {
-      const { sectionId, sceneMode, towerCameraSettled, towerBeatIndex } =
+      const { towerCameraSettled, towerBeatIndex, storyBridge } =
         useScrollStore.getState();
-      const inHero =
-        sectionId === "hero" &&
-        (sceneMode === "estate" || sceneMode === "estate-overview");
-      if (!inHero) return;
+      if (!isTourZone()) return;
 
       armIfNeeded();
       e.preventDefault();
@@ -307,6 +383,7 @@ export function useTowerTourSteps(enabled: boolean) {
 
       const currentBeat = towerBeats[towerBeatIndex];
       if (
+        storyBridge !== "beyond" &&
         currentBeat?.phase === "arrive" &&
         delta > 0 &&
         !towerCameraSettled
