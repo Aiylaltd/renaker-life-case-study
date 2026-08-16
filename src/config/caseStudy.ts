@@ -91,9 +91,9 @@ export const sections = {
     rewardsLine: "The Digital High Street",
     body: "Unlock resident rewards, perks, top picks, discovery and recommendations on the city around you.",
     askHeadline: "Ask your neighbourhood.",
-    businessHeadline: "Insight and Reach for Local businesses.",
+    businessHeadline: "Insight and reach for local businesses.",
     businessBody:
-      "Providing local businesses access their own profile within Renaker life, creating content and viewing analytics.",
+      "Local businesses grow their reach, insight and digital footprint. Managing their own profiles to create offers, rewards and content, all with real-time ROI reporting.",
   },
   resident: {
     id: "resident",

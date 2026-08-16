@@ -119,6 +119,12 @@ interface ScrollState {
   setExperienceStarted: (v: boolean) => void;
   setDemoIntroLock: (v: boolean) => void;
   setScrollCueVisible: (v: boolean) => void;
+  /**
+   * During animated section exits, only this section may be claimed —
+   * blocks ScrollTrigger thrash that re-arms steppers and teleports scroll.
+   */
+  scrollHandoff: SectionId | null;
+  setScrollHandoff: (v: SectionId | null) => void;
   requestCameraSnap: () => void;
   setModelLoadingState: (s: ScrollState["modelLoadingState"]) => void;
   setCameraDebug: (
@@ -161,6 +167,7 @@ export const useScrollStore = create<ScrollState>((set) => ({
   experienceStarted: false,
   demoIntroLock: false,
   scrollCueVisible: false,
+  scrollHandoff: null,
   cameraSnapNonce: 0,
   modelLoadingState: "fallback",
   cameraPosition: [80, 520, 780],
@@ -168,7 +175,10 @@ export const useScrollStore = create<ScrollState>((set) => ({
   qualityProfile: "desktop",
   setProgress: (progress) => set({ progress }),
   setSection: (sectionId, sectionProgress = 0) =>
-    set({ sectionId, sectionProgress }),
+    set((s) => {
+      if (s.scrollHandoff && s.scrollHandoff !== sectionId) return s;
+      return { sectionId, sectionProgress };
+    }),
   setSceneMode: (sceneMode) => set({ sceneMode }),
   setAttentionMode: (attentionMode) => set({ attentionMode }),
   setCoverReveal: (coverReveal) => set({ coverReveal }),
@@ -193,6 +203,7 @@ export const useScrollStore = create<ScrollState>((set) => ({
   setExperienceStarted: (experienceStarted) => set({ experienceStarted }),
   setDemoIntroLock: (demoIntroLock) => set({ demoIntroLock }),
   setScrollCueVisible: (scrollCueVisible) => set({ scrollCueVisible }),
+  setScrollHandoff: (scrollHandoff) => set({ scrollHandoff }),
   requestCameraSnap: () =>
     set((s) => ({ cameraSnapNonce: s.cameraSnapNonce + 1 })),
   setModelLoadingState: (modelLoadingState) => set({ modelLoadingState }),

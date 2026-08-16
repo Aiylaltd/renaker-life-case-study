@@ -48,7 +48,12 @@ export const dhsSearchBeats: DhsSearchBeat[] = [
       distance: "0.4 mi",
       logo: "/images/dhs/sexy-fish-logo.png",
       header: "/images/dhs/sexy-fish-header.png",
-      offers: [{ label: "30% Off: Renaker Life Access" }],
+      offers: [
+        {
+          label: "30% off your bill",
+          detail: "Renaker Life Access",
+        },
+      ],
     },
   },
   {
@@ -86,7 +91,12 @@ export const dhsSearchBeats: DhsSearchBeat[] = [
       distance: "0.5 mi",
       logo: "/images/dhs/breakout-logo.png",
       header: "/images/dhs/breakout-header.png",
-      offers: [{ label: "10% OFF ESCAPE ROOMS" }],
+      offers: [
+        {
+          label: "10% OFF ESCAPE ROOMS",
+          detail: "Renaker Life Access",
+        },
+      ],
     },
   },
 ];

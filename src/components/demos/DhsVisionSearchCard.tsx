@@ -38,7 +38,8 @@ export function DhsVisionSearchCard({ active }: { active: boolean }) {
             The best of Manchester at resident fingertips
           </h2>
           <p className="dhs-vision-card__pitch-body">
-            Resident AI concierge guiding through your local area offerings.
+            Aiyla&apos;s AI concierge guides residents through their local area
+            offerings.
           </p>
         </div>
 

@@ -106,12 +106,13 @@ export function TrsreSection() {
     if (!inTrsre) {
       activeRef.current = false;
       armedRef.current = false;
-      exitingRef.current = false;
       chargeRef.current = 0;
+      // Don't clear exiting mid-handoff — that re-arms and teleports scroll
+      if (!busyRef.current) exitingRef.current = false;
       return;
     }
 
-    if (exitingRef.current) return;
+    if (exitingRef.current || busyRef.current) return;
 
     if (!armedRef.current) {
       armedRef.current = true;
@@ -148,12 +149,22 @@ export function TrsreSection() {
       chargeRef.current = 0;
       setTrsreShowPins(false);
 
+      const store = useScrollStore.getState();
+      // Claim target early so rival triggers can't yank section mid-flight
+      store.setScrollHandoff("dhs-early");
+
       const dhs = document.getElementById("section-dhs-early");
-      // Land near the end of DHS so its stepper arms on the last card
       const y = dhs
         ? dhs.offsetTop + Math.max(0, dhs.offsetHeight - window.innerHeight) - 8
         : Math.max(0, window.scrollY - window.innerHeight);
-      await animateScrollTo(y, 0.75);
+      // Stay on trsre for wheel lock until parked, then hand off
+      await animateScrollTo(y, 0.7);
+      store.setSection("dhs-early", 1);
+      store.setSceneMode("dhs");
+      store.setAttentionMode("editorial");
+      store.setTrsreIntensity(0);
+      await new Promise((r) => window.setTimeout(r, 140));
+      store.setScrollHandoff(null);
       busyRef.current = false;
       exitingRef.current = false;
     };
@@ -166,11 +177,24 @@ export function TrsreSection() {
       chargeRef.current = 0;
       setTrsreShowPins(false);
 
+      const store = useScrollStore.getState();
+      store.setScrollHandoff("videos");
+
       const videos = document.getElementById("section-videos");
+      // Park on the sticky first-card hold — not a hairline past the seam
       const y = videos
-        ? videos.offsetTop + 8
+        ? videos.offsetTop + Math.round(window.innerHeight * 0.08)
         : window.scrollY + window.innerHeight;
-      await animateScrollTo(y, 0.85);
+      // Keep section=trsre during the tween so wheel stay-locked (busy)
+      await animateScrollTo(y, 0.7);
+      store.setSection("videos", 0);
+      store.setSceneMode("quiet");
+      store.setAttentionMode("editorial");
+      store.setTrsreIntensity(0);
+      store.setDhsIntensity(0);
+      // Absorb trackpad inertia before free-scroll videos takes over
+      await new Promise((r) => window.setTimeout(r, 180));
+      store.setScrollHandoff(null);
       busyRef.current = false;
       exitingRef.current = false;
     };

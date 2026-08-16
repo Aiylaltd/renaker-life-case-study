@@ -102,12 +102,12 @@ export function DhsEarlySection() {
     if (!inDhs) {
       activeRef.current = false;
       armedRef.current = false;
-      exitingRef.current = false;
       chargeRef.current = 0;
+      if (!busyRef.current) exitingRef.current = false;
       return;
     }
 
-    if (exitingRef.current) return;
+    if (exitingRef.current || busyRef.current) return;
 
     if (!armedRef.current) {
       armedRef.current = true;
@@ -182,15 +182,22 @@ export function DhsEarlySection() {
       setActiveBusinesses([]);
       useScrollStore.getState().setDhsVisionPulse(false);
       useScrollStore.getState().setDhsBreakoutRise(false);
-      // Ensure TRSRE can claim once we leave — no leftover tour lock
       useScrollStore.getState().setTowerTourStepped(false);
       useScrollStore.getState().setStoryBridge("none");
+
+      const store = useScrollStore.getState();
+      store.setScrollHandoff("trsre");
 
       const trsre = document.getElementById("section-trsre");
       const y = trsre
         ? trsre.offsetTop + 8
         : window.scrollY + window.innerHeight;
       await animateScrollTo(y, 0.85);
+      store.setSection("trsre", 0);
+      store.setSceneMode("trsre");
+      store.setAttentionMode("editorial");
+      await new Promise((r) => window.setTimeout(r, 140));
+      store.setScrollHandoff(null);
       busyRef.current = false;
       exitingRef.current = false;
     };
@@ -341,6 +348,9 @@ export function DhsEarlySection() {
                 <p className="dhs-prompt-card__query">
                   “{searchBeat.prompt}”
                 </p>
+                <p className="dhs-prompt-card__status">
+                  Aiyla AI Concierge Processing...
+                </p>
               </div>
               <DhsBusinessCard business={searchBeat.business} />
             </div>
@@ -359,7 +369,7 @@ export function DhsEarlySection() {
                 <h2 className="mt-3 text-headline editorial-type">
                   {sections.dhsEarly.businessHeadline}
                 </h2>
-                <p className="mt-4 max-w-2xl text-body text-ink/70">
+                <p className="mt-4 text-body text-ink/70">
                   {sections.dhsEarly.businessBody}
                 </p>
                 <div className="mt-6">

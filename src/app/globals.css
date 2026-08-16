@@ -799,6 +799,14 @@
     color: #0a0a0b;
   }
 
+  .dhs-prompt-card__status {
+    margin: 0.75rem 0 0;
+    font-size: 0.78rem;
+    font-weight: 560;
+    letter-spacing: 0.02em;
+    color: #7c3aed;
+  }
+
   .dhs-center-stage {
     display: flex;
     width: 100%;
