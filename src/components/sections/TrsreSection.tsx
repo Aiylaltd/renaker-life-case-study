@@ -1,12 +1,18 @@
 "use client";
 
-import { trsreCopy, trsreImages, trsrePins } from "@/config/trsre";
+import { useEffect, useRef } from "react";
+import { trsreCopy, trsreImages, trsrePins, trsreVideos } from "@/config/trsre";
 import { trsreProof } from "@/config/metrics";
 import { useScrollStore } from "@/store/scrollStore";
 
-const BEATS = 3;
+/**
+ * 0 = Beyond-style intro title
+ * 1 = map pin showcase in FOV
+ * 2 = 300 codes (title style) + video frame only
+ * 3–4 = explore / impact cards
+ */
+const BEATS = 5;
 
-/** Same even scroll-lock as Digital High Street. */
 function lockedBeat(progress: number, beats: number) {
   const p = Math.max(0, Math.min(0.999, progress));
   const scaled = p * beats;
@@ -15,11 +21,34 @@ function lockedBeat(progress: number, beats: number) {
 }
 
 export function TrsreSection() {
+  const sectionId = useScrollStore((s) => s.sectionId);
   const progress = useScrollStore((s) =>
     s.sectionId === "trsre" ? s.sectionProgress : 0,
   );
+  const setTrsreShowPins = useScrollStore((s) => s.setTrsreShowPins);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
+  const inTrsre = sectionId === "trsre";
   const { index: beat } = lockedBeat(progress, BEATS);
+  const showPanel = beat >= 3;
+
+  useEffect(() => {
+    setTrsreShowPins(inTrsre && beat >= 1);
+    return () => setTrsreShowPins(false);
+  }, [inTrsre, beat, setTrsreShowPins]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (inTrsre && beat === 2) {
+      el.currentTime = 0;
+      void el.play().catch(() => {
+        /* autoplay may be blocked until gesture — muted should allow it */
+      });
+    } else {
+      el.pause();
+    }
+  }, [inTrsre, beat]);
 
   return (
     <section
@@ -27,19 +56,48 @@ export function TrsreSection() {
       className="story-section--pin story-section--trsre"
       aria-labelledby="trsre-heading"
     >
-      <div className="city-scroll-stage">
-        <div className="container-wide city-scroll-layout">
-          <div className="city-scroll-copy">
-            {beat === 0 && (
-              <article className="city-scroll-card city-scroll-card--enter">
-                <p className="city-scroll-card__label">TRSRE</p>
-                <h2 id="trsre-heading" className="city-scroll-card__title">
-                  {trsreCopy.headline}
-                </h2>
-                <p className="city-scroll-card__body">
-                  {trsreCopy.supporting}
+      <div
+        className={`pointer-events-none fixed inset-0 z-[15] flex items-end pb-[12vh] md:items-center md:pb-0 ${
+          inTrsre ? "" : "invisible"
+        }`}
+        aria-hidden={!inTrsre}
+      >
+        <div className="container-wide w-full pointer-events-auto">
+          {inTrsre && beat === 0 ? (
+            <div className="trsre-intro-title">
+              <p className="text-label text-muted-dark">
+                {trsreCopy.introLabel}
+              </p>
+              <h2
+                id="trsre-heading"
+                className="mt-4 max-w-3xl text-display editorial-type"
+              >
+                {trsreCopy.introHeadline}
+              </h2>
+              <p className="mt-5 max-w-xl text-subhead text-ink/70">
+                {trsreCopy.introBody}
+              </p>
+            </div>
+          ) : null}
+
+          {inTrsre && beat === 2 ? (
+            <div className="trsre-codes-layout">
+              <div className="trsre-intro-title">
+                <p className="text-label text-muted-dark">
+                  {trsreCopy.codesLabel}
                 </p>
-                <div className="trsre-pin-legend" aria-label="Hunt difficulty">
+                <h2 className="mt-4 max-w-3xl text-display editorial-type">
+                  Over 300
+                  <br />
+                  hidden TRSRE codes
+                </h2>
+                <p className="mt-5 max-w-xl text-subhead text-ink/70">
+                  {trsreCopy.codesBody}
+                </p>
+                <div
+                  className="trsre-pin-legend"
+                  aria-label="Hunt difficulty"
+                >
                   <span>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={trsrePins.easySvg} alt="" />
@@ -56,63 +114,80 @@ export function TrsreSection() {
                     Hard
                   </span>
                 </div>
-              </article>
-            )}
-
-            {beat === 1 && (
-              <article className="city-scroll-card city-scroll-card--enter">
-                <p className="city-scroll-card__label">Exploration</p>
-                <p className="city-scroll-card__metric">{trsreProof.steps}</p>
-                <h2 className="city-scroll-card__title city-scroll-card__title--md">
-                  {trsreProof.stepsLabel}
-                </h2>
-                <p className="city-scroll-card__body">{trsreCopy.mapLine}</p>
-              </article>
-            )}
-
-            {beat === 2 && (
-              <article className="city-scroll-card city-scroll-card--enter">
-                <p className="city-scroll-card__label">Impact</p>
-                <blockquote className="city-scroll-card__quote">
-                  “{trsreProof.quote}”
-                </blockquote>
-                <p className="city-scroll-card__note">{trsreProof.quoteNote}</p>
-              </article>
-            )}
-          </div>
-
-          <div className="city-scroll-media">
-            <div className="city-scroll-card city-scroll-card--media city-scroll-card--enter">
-              {beat === 0 ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={trsreImages.heroCity}
-                  alt="TRSRE hunt layered over Manchester"
-                  className="trsre-media__img trsre-media__img--hero"
+              </div>
+              <div className="trsre-video-frame">
+                <video
+                  ref={videoRef}
+                  className="trsre-media__video"
+                  src={trsreVideos.halloween}
+                  muted
+                  playsInline
+                  loop
+                  autoPlay
+                  preload="metadata"
+                  aria-label="TRSRE Halloween hunt in Manchester"
                 />
-              ) : null}
-              {beat === 1 ? (
-                <div className="trsre-media__grid">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={trsreImages.bunny} alt="" />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={trsreImages.hunt1} alt="" />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={trsreImages.explore} alt="" />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={trsreImages.hunt2} alt="" />
-                </div>
-              ) : null}
-              {beat === 2 ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={trsreImages.cheque}
-                  alt="TRSRE prize winner with ceremonial cheque"
-                  className="trsre-media__img"
-                />
-              ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
+
+          {inTrsre && showPanel ? (
+            <div className="trsre-center-stage">
+              <div className="trsre-panel">
+                <div className="trsre-panel__copy">
+                  {beat === 3 && (
+                    <article className="trsre-panel__copy-inner">
+                      <p className="city-scroll-card__label">Exploration</p>
+                      <p className="city-scroll-card__metric">
+                        {trsreProof.steps}
+                      </p>
+                      <h2 className="city-scroll-card__title city-scroll-card__title--md">
+                        {trsreProof.stepsLabel}
+                      </h2>
+                      <p className="city-scroll-card__body">
+                        {trsreCopy.mapLine}
+                      </p>
+                    </article>
+                  )}
+
+                  {beat === 4 && (
+                    <article className="trsre-panel__copy-inner">
+                      <p className="city-scroll-card__label">Impact</p>
+                      <blockquote className="city-scroll-card__quote">
+                        “{trsreProof.quote}”
+                      </blockquote>
+                      <p className="city-scroll-card__note">
+                        {trsreProof.quoteNote}
+                      </p>
+                    </article>
+                  )}
+                </div>
+
+                <div className="trsre-panel__media">
+                  <div className="trsre-panel__media-frame">
+                    {beat === 3 ? (
+                      <div className="trsre-media__grid trsre-media__grid--three">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={trsreImages.stepsMap} alt="" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={trsreImages.stepsHunt} alt="" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={trsreImages.stepsApp} alt="" />
+                      </div>
+                    ) : null}
+                    {beat === 4 ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={trsreImages.cheque}
+                        alt="TRSRE prize winner with ceremonial cheque"
+                        className="trsre-media__img"
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

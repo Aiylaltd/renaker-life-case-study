@@ -145,7 +145,7 @@ export const qualityProfiles = {
   desktop: {
     dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 6,
+    maxTrsrePins: 15,
     maxDhsPaths: 4,
     postprocessing: false,
     cityDensity: 1,
@@ -153,7 +153,7 @@ export const qualityProfiles = {
   mobile: {
     dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 5,
+    maxTrsrePins: 12,
     maxDhsPaths: 2,
     postprocessing: false,
     cityDensity: 0.55,
@@ -161,7 +161,7 @@ export const qualityProfiles = {
   reduced: {
     dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 4,
+    maxTrsrePins: 10,
     maxDhsPaths: 1,
     postprocessing: false,
     cityDensity: 0.4,

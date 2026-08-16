@@ -77,15 +77,6 @@ export function CaseStudyPage() {
         <TrsreSection />
         <VideosSection />
         <FinaleSection />
-
-        <footer className="relative z-10 border-t border-ink/8 bg-warm/80 py-10 backdrop-blur-sm">
-          <div className="container-editorial flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <p className="text-sm text-ink/60">
-              {brand.product} — a Renaker case study powered by {brand.poweredBy}
-            </p>
-            <p className="text-sm text-ink/45">{brand.positioning}</p>
-          </div>
-        </footer>
       </main>
     </>
   );

@@ -155,7 +155,7 @@ export const sections = {
   finale: {
     id: "finale",
     brand: "Aiyla",
-    line: "The intelligence behind Renaker Life.",
+    line: "Powering Renaker Life",
     supporting: "Connecting buildings, residents and the city around them.",
   },
 } as const;

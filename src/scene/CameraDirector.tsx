@@ -214,8 +214,15 @@ function compositionForState(): {
       _desiredTarget.set(a.x, 16, a.z);
       lerp = 0.024;
       fov = 42;
+    } else if (state.dhsBreakoutRise) {
+      // After Breakout — rise only from that pin for vision + insight cards
+      const breakout = AnchorRegistry.getPosition("ANCHOR_BIZ3");
+      _desiredPos.set(breakout.x + 95, 300, breakout.z + 210);
+      _desiredTarget.set(breakout.x, 24, breakout.z);
+      lerp = 0.018;
+      fov = 48;
     } else {
-      // Wide overlook for intro + vision queries beat
+      // Wide overlook for DHS intro
       _desiredPos.set(80, 320, 560);
       _desiredTarget.set(10, 40, 20);
       lerp = 0.016;
@@ -227,19 +234,19 @@ function compositionForState(): {
     _desiredTarget.set(a.x, 80, a.z);
     lerp = state.attentionMode === "editorial" ? 0.01 : 0.018;
   } else if (mode === "trsre") {
-    // Continue from the DHS city frame — soft drift only, no tower pull-back
-    _desiredPos.set(95, 235, 360);
-    _desiredTarget.set(25, 28, 30);
-    lerp = 0.008;
-    fov = 44;
+    const dgs = AnchorRegistry.getPosition("ANCHOR_DGS");
+    const bankside = AnchorRegistry.getPosition("ANCHOR_BANKSIDE");
+    // Hold one settled POV for intro + Discover (and later cards) —
+    // travel here once on enter from DHS; no further scroll-driven moves.
+    _desiredPos.set(bankside.x + 200, 574, bankside.z + 420);
+    _desiredTarget.set(dgs.x, dgs.y + 140, dgs.z);
+    lerp = 0.018;
+    fov = 54;
   } else if (mode === "finale") {
-    _desiredPos.set(
-      0,
-      620 + state.orbReveal * 180,
-      820 - state.orbReveal * 320,
-    );
-    _desiredTarget.set(0, 80 + state.orbReveal * 40, 0);
-    lerp = 0.016;
+    // Locked — scrolling the short finale must not keep moving the camera
+    _desiredPos.set(0, 700, 620);
+    _desiredTarget.set(0, 90, 0);
+    lerp = 0.02;
   } else if (mode === "quiet" || mode === "overview") {
     _desiredPos.set(-120, 400, 620);
     _desiredTarget.set(40, 40, -20);
@@ -324,11 +331,11 @@ export function CameraDirector() {
     if (state.sceneMode !== lastMode.current) {
       const prev = lastMode.current;
       lastMode.current = state.sceneMode;
-      if (state.sceneMode === "dhs") {
-        // Arrive in the city, then pin zooms take over
+      if (state.sceneMode === "dhs" || state.sceneMode === "trsre") {
+        // Arrive in the city / aerial frame without a hard stop
         vel.current.multiplyScalar(0.25);
         lookVel.current.multiplyScalar(0.25);
-        lerp = Math.max(lerp, 0.022);
+        lerp = Math.max(lerp, state.sceneMode === "trsre" ? 0.028 : 0.022);
       } else {
         vel.current.set(0, 0, 0);
         lookVel.current.set(0, 0, 0);

@@ -1,58 +1,71 @@
 "use client";
 
-import { brand, sections } from "@/config/caseStudy";
+import { sections } from "@/config/caseStudy";
 import { Button } from "@/components/ui/Button";
+import { RenakerLifeLogo } from "@/components/ui/RenakerLifeLogo";
+import { FinaleLiquidOrb } from "@/components/liquid-bubble/FinaleLiquidOrb";
 import { useScrollStore } from "@/store/scrollStore";
 
 export function FinaleSection() {
+  const sectionId = useScrollStore((s) => s.sectionId);
   const orb = useScrollStore((s) => s.orbReveal);
+  const year = new Date().getFullYear();
+
+  // Latch once — avoid scroll-tied opacity that flickers mid-section
+  const inFinale = sectionId === "finale" && orb > 0.08;
 
   return (
     <section
       id="section-finale"
-      className="story-section--tall"
+      className={`story-section--finale ${inFinale ? "is-active" : ""}`}
       aria-labelledby="finale-heading"
     >
-      <div className="sticky top-0 flex min-h-[100svh] items-center justify-center py-16">
-        <div className="container-narrow text-center">
-          <p
-            className={`text-label tracking-[0.2em] transition-opacity duration-700 ${
-              orb < 0.4 ? "opacity-100 text-ink/70" : "opacity-40 text-ink/50"
-            }`}
-          >
-            {brand.product}
-          </p>
-          <h2
-            id="finale-heading"
-            className={`mt-6 text-display transition-all duration-1000 ${
-              orb > 0.35 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            {sections.finale.brand}
-          </h2>
-          <p
-            className={`mt-5 text-subhead text-ink/70 transition-opacity duration-700 ${
-              orb > 0.5 ? "opacity-100" : "opacity-0"
-            }`}
-          >
+      <div className="finale-blackout" aria-hidden />
+
+      <div className="finale-stage">
+        <div className={`finale-content ${inFinale ? "is-on" : ""}`}>
+          <div className="finale-logo">
+            <RenakerLifeLogo variant="light" />
+          </div>
+
+          <FinaleLiquidOrb active={inFinale} />
+
+          <h2 id="finale-heading" className="finale-line">
             {sections.finale.line}
-          </p>
-          <p
-            className={`mt-3 text-body text-ink/60 transition-opacity duration-700 ${
-              orb > 0.65 ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            {sections.finale.supporting}
-          </p>
-          <div
-            className={`mt-10 transition-opacity duration-700 ${
-              orb > 0.8 ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            <Button href="https://aiyla.co.uk" external theme="light">
-              Explore Aiyla
+          </h2>
+
+          <div className="finale-actions">
+            <Button href="https://aiyla.co.uk" external theme="dark">
+              Visit Aiyla
+            </Button>
+            <Button
+              href="https://renakerlife.com"
+              external
+              theme="dark"
+              variant="secondary"
+            >
+              View Renaker Life
             </Button>
           </div>
+
+          <div className="finale-contact">
+            <p className="finale-contact__eyebrow">Contact Aiyla</p>
+            <p className="finale-contact__body">
+              For enquiries about how Aiyla can enhance your real estate,
+              contact us here
+            </p>
+            <Button
+              href="mailto:hello@aiyla.co.uk"
+              theme="dark"
+              className="finale-contact__btn"
+            >
+              Contact
+            </Button>
+          </div>
+
+          <p className="finale-legal">
+            © {year} Aiyla LTD. Renaker belongs to Renaker Build.
+          </p>
         </div>
       </div>
     </section>

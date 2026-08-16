@@ -60,6 +60,10 @@ interface ScrollState {
   activeBusinesses: AnchorName[];
   /** Beat 4 — scatter purple pulses across the city while queries list */
   dhsVisionPulse: boolean;
+  /** After Breakout — hold the risen overlook through remaining DHS beats */
+  dhsBreakoutRise: boolean;
+  /** TRSRE pin showcase beat onward — map pins visible in FOV */
+  trsreShowPins: boolean;
   cityAwake: number;
   dhsIntensity: number;
   trsreIntensity: number;
@@ -103,6 +107,8 @@ interface ScrollState {
   setStoryBridge: (v: ScrollState["storyBridge"]) => void;
   setActiveBusinesses: (a: AnchorName[]) => void;
   setDhsVisionPulse: (v: boolean) => void;
+  setDhsBreakoutRise: (v: boolean) => void;
+  setTrsreShowPins: (v: boolean) => void;
   setCityAwake: (v: number) => void;
   setDhsIntensity: (v: number) => void;
   setTrsreIntensity: (v: number) => void;
@@ -143,6 +149,8 @@ export const useScrollStore = create<ScrollState>((set) => ({
   storyBridge: "none",
   activeBusinesses: [],
   dhsVisionPulse: false,
+  dhsBreakoutRise: false,
+  trsreShowPins: false,
   cityAwake: 0,
   dhsIntensity: 0,
   trsreIntensity: 0,
@@ -173,6 +181,8 @@ export const useScrollStore = create<ScrollState>((set) => ({
   setStoryBridge: (storyBridge) => set({ storyBridge }),
   setActiveBusinesses: (activeBusinesses) => set({ activeBusinesses }),
   setDhsVisionPulse: (dhsVisionPulse) => set({ dhsVisionPulse }),
+  setDhsBreakoutRise: (dhsBreakoutRise) => set({ dhsBreakoutRise }),
+  setTrsreShowPins: (trsreShowPins) => set({ trsreShowPins }),
   setCityAwake: (cityAwake) => set({ cityAwake }),
   setDhsIntensity: (dhsIntensity) => set({ dhsIntensity }),
   setTrsreIntensity: (trsreIntensity) => set({ trsreIntensity }),

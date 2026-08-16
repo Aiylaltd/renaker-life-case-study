@@ -88,9 +88,13 @@ export function DhsEarlySection() {
     beatRef.current = beat;
     if (inDhs) {
       setActiveBusinesses(businessesForBeat(beat));
-      useScrollStore.getState().setDhsVisionPulse(beat === 4);
+      const store = useScrollStore.getState();
+      store.setDhsVisionPulse(beat === 4);
+      store.setDhsBreakoutRise(beat >= 4);
     } else {
-      useScrollStore.getState().setDhsVisionPulse(false);
+      const store = useScrollStore.getState();
+      store.setDhsVisionPulse(false);
+      store.setDhsBreakoutRise(false);
     }
   }, [beat, inDhs, setActiveBusinesses]);
 
@@ -139,6 +143,7 @@ export function DhsEarlySection() {
       });
       setActiveBusinesses([]);
       useScrollStore.getState().setDhsVisionPulse(false);
+      useScrollStore.getState().setDhsBreakoutRise(false);
 
       const dhs = document.getElementById("section-dhs-early");
       const hero = document.getElementById("section-hero");
@@ -161,6 +166,7 @@ export function DhsEarlySection() {
       chargeRef.current = 0;
       setActiveBusinesses([]);
       useScrollStore.getState().setDhsVisionPulse(false);
+      useScrollStore.getState().setDhsBreakoutRise(false);
 
       const trsre = document.getElementById("section-trsre");
       const y = trsre

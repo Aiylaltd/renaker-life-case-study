@@ -1,28 +1,54 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { useFrame, useLoader } from "@react-three/fiber";
+import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { trsrePins, type TrsrePinDifficulty } from "@/config/trsre";
+import { trsrePinConfig } from "@/config/scene";
 import { useScrollStore } from "@/store/scrollStore";
+import { AnchorRegistry } from "@/scene/AnchorRegistry";
 
 const PIN_ORDER: TrsrePinDifficulty[] = ["easy", "medium", "hard"];
 
-/** A few pins only — placed in the DHS→TRSRE camera field of view */
-const FOV_PINS: { offset: [number, number, number]; difficulty: TrsrePinDifficulty }[] =
+/** Clearance above city / plinth so markers sit in open air */
+const PLINTH_CLEARANCE = 88;
+
+/** Distance where pin scale ≈ base size (city metres) */
+const SCALE_REF_DIST = 520;
+const SCALE_BASE = 52;
+const SCALE_MIN = 20;
+const SCALE_MAX = 120;
+
+/**
+ * ~15 hunt pins — wide scatter across the Bankside → Deansgate aerial FOV.
+ */
+const FOV_PINS: { offset: [number, number]; difficulty: TrsrePinDifficulty }[] =
   [
-    { offset: [-35, 22, 55], difficulty: "easy" },
-    { offset: [48, 18, 20], difficulty: "medium" },
-    { offset: [10, 26, -25], difficulty: "hard" },
-    { offset: [-55, 16, -10], difficulty: "easy" },
-    { offset: [70, 20, 70], difficulty: "medium" },
-    { offset: [-15, 24, 95], difficulty: "hard" },
+    { offset: [-280, 320], difficulty: "easy" },
+    { offset: [340, 180], difficulty: "medium" },
+    { offset: [80, -260], difficulty: "hard" },
+    { offset: [-420, 40], difficulty: "easy" },
+    { offset: [460, 380], difficulty: "medium" },
+    { offset: [-120, 480], difficulty: "hard" },
+    { offset: [220, 520], difficulty: "easy" },
+    { offset: [-500, 260], difficulty: "medium" },
+    { offset: [380, -80], difficulty: "hard" },
+    { offset: [-200, -300], difficulty: "easy" },
+    { offset: [140, -420], difficulty: "medium" },
+    { offset: [520, 120], difficulty: "hard" },
+    { offset: [-360, 540], difficulty: "easy" },
+    { offset: [40, 280], difficulty: "medium" },
+    { offset: [300, 640], difficulty: "hard" },
   ];
 
 type PinDatum = {
-  position: THREE.Vector3;
+  x: number;
+  z: number;
   difficulty: TrsrePinDifficulty;
 };
+
+const _pinWorld = new THREE.Vector3();
+const _lookTarget = new THREE.Vector3();
 
 function usePinTextures() {
   const [easy, medium, hard] = useLoader(THREE.TextureLoader, [
@@ -41,7 +67,11 @@ function usePinTextures() {
   return { easy, medium, hard } as const;
 }
 
-function PinSprites({
+/**
+ * Full camera-facing billboards (always flat to the lens) + light disc bases.
+ * Scale falls off with distance for depth.
+ */
+function HuntPins({
   pins,
   textures,
 }: {
@@ -49,74 +79,165 @@ function PinSprites({
   textures: Record<TrsrePinDifficulty, THREE.Texture>;
 }) {
   const intensity = useScrollStore((s) => s.trsreIntensity);
-  const group = useRef<THREE.Group>(null);
-  const materials = useMemo(
+  const showPins = useScrollStore((s) => s.trsreShowPins);
+  const { camera } = useThree();
+  const root = useRef<THREE.Group>(null);
+  const cardRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const revealRef = useRef(0);
+
+  const planeGeo = useMemo(() => new THREE.PlaneGeometry(1, 1.28), []);
+  const baseGeo = useMemo(() => new THREE.CircleGeometry(1, 18), []);
+
+  const pinMats = useMemo(() => {
+    const mk = (map: THREE.Texture) =>
+      new THREE.MeshBasicMaterial({
+        map,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        opacity: 0,
+      });
+    return {
+      easy: mk(textures.easy),
+      medium: mk(textures.medium),
+      hard: mk(textures.hard),
+    };
+  }, [textures]);
+
+  const baseMat = useMemo(
     () =>
-      pins.map(
-        (pin) =>
-          new THREE.SpriteMaterial({
-            map: textures[pin.difficulty],
-            transparent: true,
-            depthWrite: false,
-            opacity: 0,
-          }),
-      ),
-    [pins, textures],
+      new THREE.MeshBasicMaterial({
+        color: "#f7f6f3",
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      }),
+    [],
   );
 
   useEffect(() => {
     return () => {
-      materials.forEach((m) => m.dispose());
+      planeGeo.dispose();
+      baseGeo.dispose();
+      pinMats.easy.dispose();
+      pinMats.medium.dispose();
+      pinMats.hard.dispose();
+      baseMat.dispose();
     };
-  }, [materials]);
+  }, [planeGeo, baseGeo, pinMats, baseMat]);
 
-  useFrame(() => {
-    if (!group.current) return;
-    group.current.visible = intensity > 0.02;
-    const reveal = Math.floor(Math.min(1, intensity * 1.2) * pins.length);
+  useFrame((_, delta) => {
+    if (!root.current) return;
 
-    group.current.children.forEach((child, i) => {
-      const sprite = child as THREE.Sprite;
-      const shown = i < reveal;
-      // Small + quiet — no pulsing
-      const s = shown ? 11 * Math.min(1, 0.7 + intensity * 0.35) : 0;
-      sprite.scale.set(s, s, 1);
-      const mat = sprite.material as THREE.SpriteMaterial;
-      mat.opacity = shown ? Math.min(0.72, 0.28 + intensity * 0.4) : 0;
+    const grounded = Math.max(
+      trsrePinConfig.minY + 20,
+      AnchorRegistry.getGroundY() + PLINTH_CLEARANCE,
+    );
+    root.current.children.forEach((child) => {
+      if (child.position.y !== grounded) child.position.y = grounded;
     });
+
+    const active = showPins && intensity > 0.02;
+    root.current.visible = active;
+
+    if (!active) {
+      revealRef.current = 0;
+      pinMats.easy.opacity = 0;
+      pinMats.medium.opacity = 0;
+      pinMats.hard.opacity = 0;
+      baseMat.opacity = 0;
+      return;
+    }
+
+    revealRef.current = Math.min(
+      pins.length,
+      revealRef.current + delta * (pins.length / 1.05),
+    );
+    const reveal = Math.floor(revealRef.current);
+    const opacity = Math.min(0.96, 0.55 + intensity * 0.4);
+    baseMat.opacity = Math.min(0.8, 0.35 + intensity * 0.4);
+    pinMats.easy.opacity = opacity;
+    pinMats.medium.opacity = opacity;
+    pinMats.hard.opacity = opacity;
+
+    for (let i = 0; i < pins.length; i++) {
+      const pin = pins[i];
+      const card = cardRefs.current[i];
+      const group = root.current.children[i] as THREE.Group | undefined;
+      if (!pin || !card || !group) continue;
+
+      const shown = i < reveal;
+      group.visible = shown;
+      if (!shown) continue;
+
+      _pinWorld.set(pin.x, grounded + 30, pin.z);
+      const dist = camera.position.distanceTo(_pinWorld);
+      const s = THREE.MathUtils.clamp(
+        SCALE_BASE * (SCALE_REF_DIST / Math.max(120, dist)),
+        SCALE_MIN,
+        SCALE_MAX,
+      );
+      card.scale.set(s, s, 1);
+      // Face the camera fully so the marker always reads flat on screen
+      card.position.set(0, 30, 0);
+      _lookTarget.copy(camera.position);
+      card.lookAt(_lookTarget);
+
+      const base = group.children[0] as THREE.Mesh | undefined;
+      if (base) {
+        const bs = THREE.MathUtils.clamp(s * 0.2, 5, 20);
+        base.scale.set(bs, bs, 1);
+      }
+    }
   });
 
   return (
-    <group ref={group}>
+    <group ref={root}>
       {pins.map((pin, i) => (
-        <sprite
+        <group
           key={`${pin.difficulty}-${i}`}
-          position={pin.position}
-          material={materials[i]}
-          frustumCulled
-        />
+          position={[pin.x, trsrePinConfig.minY + 20, pin.z]}
+        >
+          <mesh
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[0, 0.5, 0]}
+            geometry={baseGeo}
+            material={baseMat}
+            renderOrder={3}
+            frustumCulled={false}
+          />
+          <mesh
+            ref={(el) => {
+              cardRefs.current[i] = el;
+            }}
+            geometry={planeGeo}
+            material={pinMats[pin.difficulty]}
+            renderOrder={4}
+            frustumCulled={false}
+          />
+        </group>
       ))}
     </group>
   );
 }
 
-export function TRSREMarkers({ maxPins = 6 }: { maxPins?: number }) {
+export function TRSREMarkers({ maxPins = 15 }: { maxPins?: number }) {
   const textures = usePinTextures();
 
   const pins = useMemo(() => {
-    // Anchored around the TRSRE look-at so they sit in the current FOV
-    const origin = new THREE.Vector3(25, 20, 30);
+    const dgs = AnchorRegistry.getPosition("ANCHOR_DGS");
+    const bankside = AnchorRegistry.getPosition("ANCHOR_BANKSIDE");
+    const origin = dgs.clone().lerp(bankside, 0.28);
     return FOV_PINS.slice(0, Math.min(maxPins, FOV_PINS.length)).map(
       (pin, i) => ({
-        position: origin
-          .clone()
-          .add(new THREE.Vector3(...pin.offset)),
+        x: origin.x + pin.offset[0],
+        z: origin.z + pin.offset[1],
         difficulty: pin.difficulty ?? PIN_ORDER[i % PIN_ORDER.length],
       }),
     );
   }, [maxPins]);
 
-  return <PinSprites pins={pins} textures={textures} />;
+  return <HuntPins pins={pins} textures={textures} />;
 }
 
 /** Kept for SceneManager import compatibility — no busy route web on TRSRE */

@@ -14,13 +14,21 @@ export function VideoStory({
   upcoming?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const activeRef = useRef(active);
+  activeRef.current = active;
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    if (!active) {
-      el.pause();
-    }
+    if (active) return;
+
+    // Debounce pause so brief active blips don’t hitch playback
+    const t = window.setTimeout(() => {
+      if (!activeRef.current) {
+        videoRef.current?.pause();
+      }
+    }, 200);
+    return () => window.clearTimeout(t);
   }, [active]);
 
   return (
@@ -31,17 +39,40 @@ export function VideoStory({
     >
       <GlassPanel variant="light" className="video-card__panel">
         {story.src ? (
-          <div className="video-card__media">
+          <div
+            className="video-card__media"
+            style={
+              story.poster
+                ? {
+                    backgroundImage: `url(${story.poster})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }
+                : undefined
+            }
+          >
             <video
               ref={videoRef}
-              className="h-full w-full object-cover"
-              controls={active}
+              controls
               playsInline
-              preload="metadata"
+              preload={active || upcoming ? "metadata" : "none"}
+              poster={story.poster}
               aria-label={story.posterLabel}
             >
               <source src={story.src} type="video/mp4" />
             </video>
+          </div>
+        ) : story.poster ? (
+          <div
+            className="video-card__media"
+            role="img"
+            aria-label={story.posterLabel}
+          >
+            <img
+              src={story.poster}
+              alt=""
+              className="h-full w-full object-cover"
+            />
           </div>
         ) : (
           <div
@@ -59,7 +90,17 @@ export function VideoStory({
           </div>
         )}
         <div className="video-card__copy">
-          <p className="text-label text-muted-dark">{story.role}</p>
+          <p className="text-label text-muted-dark">
+            {story.brand ? (
+              <>
+                <strong className="font-semibold text-ink">{story.brand}</strong>
+                {" · "}
+                {story.role}
+              </>
+            ) : (
+              story.role
+            )}
+          </p>
           <h3 id={`video-${story.id}`} className="mt-2 text-headline">
             {story.title}
           </h3>

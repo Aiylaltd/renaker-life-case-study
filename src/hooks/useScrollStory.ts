@@ -80,14 +80,16 @@ export function useScrollStory(enabled: boolean) {
         editorial?: boolean;
         enterProgress?: number;
         enterBackProgress?: number;
+        start?: string;
+        end?: string;
       },
     ) => {
       const el = document.getElementById(id);
       if (!el) return;
       const st = ScrollTrigger.create({
         trigger: el,
-        start: "top center",
-        end: "bottom center",
+        start: opts?.start ?? "top center",
+        end: opts?.end ?? "bottom center",
         onEnter: () => {
           setSection(section, opts?.enterProgress ?? 0);
           if (opts?.editorial) setAttentionMode("editorial");
@@ -414,28 +416,43 @@ export function useScrollStory(enabled: boolean) {
 
     watch("section-trsre", "trsre", (p) => {
       setSceneMode("trsre");
-      // Stay calm — soft pin fade-in, no cinematic whip
       setAttentionMode("editorial");
       setTrsreIntensity(Math.min(1, 0.15 + p * 0.75));
-      setDhsIntensity(Math.max(0.12, 0.4 - p * 0.25));
+      setDhsIntensity(Math.max(0, 0.35 - p * 0.45));
       setDoorlyIntensity(0);
-    });
+    }, { start: "top center", end: "bottom top" });
 
-    watch("section-videos", "videos", () => {
-      setSceneMode("quiet");
-      setAttentionMode("editorial");
-      setTrsreIntensity(0);
-      setDhsIntensity(0);
-      setDoorlyIntensity(0);
-    }, { editorial: true, enterProgress: 0, enterBackProgress: 1 });
+    watch(
+      "section-videos",
+      "videos",
+      () => {
+        setSceneMode("quiet");
+        setAttentionMode("editorial");
+        setTrsreIntensity(0);
+        setDhsIntensity(0);
+        setDoorlyIntensity(0);
+        setHaze(0);
+        setOrbReveal(0);
+      },
+      {
+        editorial: true,
+        enterProgress: 0,
+        enterBackProgress: 1,
+        // Wait until TRSRE Impact has cleared — don't steal mid-card
+        start: "top 18%",
+        end: "bottom center",
+      },
+    );
 
     watch("section-finale", "finale", (p) => {
       setSceneMode("finale");
       setAttentionMode("cinematic");
-      setHaze(Math.min(1, p * 1.1));
-      setOrbReveal(Math.max(0, (p - 0.35) * 1.6));
-      setDhsIntensity(Math.max(0, 0.35 - p * 0.5));
-      setTrsreIntensity(Math.max(0, 0.25 - p * 0.3));
+      // Snap quickly so the slide doesn't flicker through mid-opacity states
+      const settle = Math.min(1, p * 2.4);
+      setHaze(settle);
+      setOrbReveal(settle);
+      setDhsIntensity(0);
+      setTrsreIntensity(0);
       setDoorlyIntensity(0);
     });
 

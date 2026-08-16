@@ -11,7 +11,6 @@ import { RenakerModels } from "@/scene/RenakerModels";
 import { DigitalHighStreetPaths } from "@/scene/layers/DigitalHighStreet";
 import { TRSREMarkers, TRSRERoutes } from "@/scene/layers/TRSREMarkers";
 import { DoorlyRoutes } from "@/scene/layers/DoorlyRoutes";
-import { FinaleOrb } from "@/scene/layers/FinaleOrb";
 import { sceneAssets } from "@/config/scene";
 import { useScrollStore } from "@/store/scrollStore";
 import { getQualitySettings } from "@/scene/quality";
@@ -43,30 +42,43 @@ function Atmosphere() {
 
   useFrame(() => {
     const t = useScrollStore.getState().coverReveal;
+    const haze = useScrollStore.getState().haze;
     const cityAwake = useScrollStore.getState().cityAwake;
-    if (Math.abs(t - lastT.current) < 0.002 && Math.abs(t - 1) > 0.01) return;
-    lastT.current = t;
+    const lit = t * (1 - haze);
+    if (
+      Math.abs(lit - lastT.current) < 0.002 &&
+      Math.abs(haze - 1) > 0.01 &&
+      Math.abs(t - 1) > 0.01
+    ) {
+      return;
+    }
+    lastT.current = lit;
 
-    _bg.copy(BG_DARK).lerp(BG_LIGHT, t);
-    _ground.copy(GROUND_DARK).lerp(GROUND_LIGHT, t);
+    _bg.copy(BG_DARK).lerp(BG_LIGHT, lit);
+    _ground.copy(GROUND_DARK).lerp(GROUND_LIGHT, lit);
     scene.background = _bg;
     gl.setClearColor(_bg, 1);
 
     if (scene.fog instanceof THREE.Fog) {
       scene.fog.color.copy(_bg);
-      scene.fog.near = 280 + t * 620;
-      scene.fog.far = 1400 + t * 2400;
+      scene.fog.near = 280 + lit * 620;
+      scene.fog.far = 1400 + lit * 2400;
     }
 
     if (ambientRef.current) {
-      ambientRef.current.intensity = 0.08 + t * 0.52 + cityAwake * 0.08;
+      ambientRef.current.intensity =
+        (0.08 + t * 0.52 + cityAwake * 0.08) * (1 - haze * 0.92);
     }
     if (hemiRef.current) {
-      hemiRef.current.intensity = 0.12 + t * 0.55;
-      hemiRef.current.groundColor.set(t > 0.4 ? "#8a8378" : "#0e0e12");
+      hemiRef.current.intensity = (0.12 + t * 0.55) * (1 - haze);
+      hemiRef.current.groundColor.set(lit > 0.4 ? "#8a8378" : "#0e0e12");
     }
-    if (keyRef.current) keyRef.current.intensity = 0.08 + t * 1.1;
-    if (fillRef.current) fillRef.current.intensity = 0.04 + t * 0.35;
+    if (keyRef.current) {
+      keyRef.current.intensity = (0.08 + t * 1.1) * (1 - haze);
+    }
+    if (fillRef.current) {
+      fillRef.current.intensity = (0.04 + t * 0.35) * (1 - haze);
+    }
     if (groundMat.current) groundMat.current.color.copy(_ground);
   });
 
@@ -150,11 +162,6 @@ function DeferredOverlays({
           </Suspense>
           <TRSRERoutes />
         </>
-      )}
-      {layer === "finale" && (
-        <Suspense fallback={null}>
-          <FinaleOrb />
-        </Suspense>
       )}
     </>
   );
