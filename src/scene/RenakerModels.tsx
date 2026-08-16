@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
+import { Suspense, useLayoutEffect, useMemo, useRef, useState, useEffect } from "react";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { AnchorRegistry } from "@/scene/AnchorRegistry";
@@ -8,6 +8,7 @@ import { TowerDebugRegistry } from "@/scene/TowerDebugRegistry";
 import { renakerModelEntries, type AnchorName } from "@/config/scene";
 import { getDevelopmentByAnchor } from "@/config/developments";
 import { ModelErrorBoundary } from "@/scene/ModelErrorBoundary";
+import { useScrollStore } from "@/store/scrollStore";
 
 const _yaw = new THREE.Quaternion();
 const _offset = new THREE.Vector3();
@@ -171,11 +172,36 @@ function TowerInstance({
 /**
  * Places Renaker development GLBs at AnchorRegistry world poses.
  * Combined Blade/Three60 loads once.
+ * Mobile: load only the active tower (+ DGS seed) to avoid Safari OOM.
  */
 export function RenakerModels() {
+  const profile = useScrollStore((s) => s.qualityProfile);
+  const active = useScrollStore((s) => s.activeDevelopment);
+  const [mobileLoaded, setMobileLoaded] = useState(() => new Set(["dgs"]));
+
+  useEffect(() => {
+    if (profile === "desktop") return;
+    if (!active) return;
+    const entry = renakerModelEntries.find((e) =>
+      (e.anchors as string[]).includes(active),
+    );
+    if (!entry) return;
+    setMobileLoaded((prev) => {
+      if (prev.has(entry.id)) return prev;
+      const next = new Set(prev);
+      next.add(entry.id);
+      return next;
+    });
+  }, [active, profile]);
+
+  const entries =
+    profile === "desktop"
+      ? renakerModelEntries
+      : renakerModelEntries.filter((e) => mobileLoaded.has(e.id));
+
   return (
     <group name="renaker-towers">
-      {renakerModelEntries.map((entry) => (
+      {entries.map((entry) => (
         <ModelErrorBoundary key={entry.id} name={entry.id}>
           <Suspense fallback={null}>
             <TowerInstance

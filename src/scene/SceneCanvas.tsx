@@ -7,6 +7,7 @@ import { useQualityProfile } from "@/hooks/useQualityProfile";
 import { useDebug3d } from "@/hooks/useDebug3d";
 import { cameraDefaults } from "@/config/scene";
 import { useScrollStore } from "@/store/scrollStore";
+import { useIsMobileUi } from "@/hooks/useIsMobileUi";
 
 class CanvasErrorBoundary extends Component<
   { children: ReactNode; onError: (msg: string) => void },
@@ -32,18 +33,21 @@ class CanvasErrorBoundary extends Component<
 export function SceneCanvas() {
   useQualityProfile();
   const debug = useDebug3d();
+  const mobileUi = useIsMobileUi();
   const experienceStarted = useScrollStore((s) => s.experienceStarted);
   const loaderDone = useScrollStore((s) => s.loaderDone);
   const sectionId = useScrollStore((s) => s.sectionId);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  // Render while the loading screen covers the canvas so city + towers upload
-  // to the GPU before the user ever sees the 3D view.
-  const warmScene = !loaderDone || experienceStarted;
-  // Pause city under videos; keep it alive under a translucent finale veil
+  // Desktop: warm city under the loading veil.
+  // Mobile: defer WebGL until Start — preloading ~33MB GLBs crashes many iPhones.
+  const warmScene = mobileUi
+    ? experienceStarted
+    : !loaderDone || experienceStarted;
   const editorialHold = sectionId === "videos";
   const runScene = warmScene && !editorialHold;
+  const mountCanvas = !mobileUi || experienceStarted;
 
   useEffect(() => {
     setMounted(true);
@@ -56,34 +60,36 @@ export function SceneCanvas() {
   return (
     <>
       <div className="scene-canvas" aria-hidden>
-        <CanvasErrorBoundary onError={setError}>
-          <Canvas
-            dpr={1}
-            gl={{
-              antialias: false,
-              powerPreference: "high-performance",
-              alpha: false,
-              stencil: false,
-              depth: true,
-              failIfMajorPerformanceCaveat: false,
-              preserveDrawingBuffer: false,
-            }}
-            camera={{
-              fov: cameraDefaults.fov,
-              near: cameraDefaults.near,
-              far: cameraDefaults.far,
-              position: cameraDefaults.overview.position,
-            }}
-            frameloop={runScene ? "always" : "never"}
-            style={{ width: "100%", height: "100%", display: "block" }}
-            onCreated={({ gl }) => {
-              gl.setClearColor("#050506", 1);
-              gl.shadowMap.enabled = false;
-            }}
-          >
-            <SceneManager debug={debug} />
-          </Canvas>
-        </CanvasErrorBoundary>
+        {mountCanvas ? (
+          <CanvasErrorBoundary onError={setError}>
+            <Canvas
+              dpr={1}
+              gl={{
+                antialias: false,
+                powerPreference: mobileUi ? "low-power" : "high-performance",
+                alpha: false,
+                stencil: false,
+                depth: true,
+                failIfMajorPerformanceCaveat: false,
+                preserveDrawingBuffer: false,
+              }}
+              camera={{
+                fov: cameraDefaults.fov,
+                near: cameraDefaults.near,
+                far: cameraDefaults.far,
+                position: cameraDefaults.overview.position,
+              }}
+              frameloop={runScene ? "always" : "never"}
+              style={{ width: "100%", height: "100%", display: "block" }}
+              onCreated={({ gl }) => {
+                gl.setClearColor("#050506", 1);
+                gl.shadowMap.enabled = false;
+              }}
+            >
+              <SceneManager debug={debug} />
+            </Canvas>
+          </CanvasErrorBoundary>
+        ) : null}
       </div>
 
       {error && (

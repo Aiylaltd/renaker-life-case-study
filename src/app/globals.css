@@ -3401,6 +3401,25 @@
     color: rgba(245, 242, 237, 0.85);
   }
 
+  .prologue__continue--mobile {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    .prologue__continue--desktop {
+      display: none;
+    }
+
+    .prologue__continue--mobile {
+      display: inline;
+    }
+
+    .prologue__ghost-cta {
+      min-height: 2.75rem;
+      padding: 0.65rem 0;
+    }
+  }
+
   .prologue__fixed-stage {
     position: relative;
     z-index: 1;

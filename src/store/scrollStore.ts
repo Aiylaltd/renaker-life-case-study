@@ -79,6 +79,8 @@ interface ScrollState {
   scrollCueVisible: boolean;
   /** Bump to force CameraDirector to hard-cut to the current composition */
   cameraSnapNonce: number;
+  /** Bump to return the prologue to the first landing (orientation) */
+  prologueHomeNonce: number;
   modelLoadingState: "idle" | "loading" | "ready" | "fallback";
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
@@ -126,6 +128,8 @@ interface ScrollState {
   scrollHandoff: SectionId | null;
   setScrollHandoff: (v: SectionId | null) => void;
   requestCameraSnap: () => void;
+  /** Return to the first prologue landing page */
+  requestPrologueHome: () => void;
   setModelLoadingState: (s: ScrollState["modelLoadingState"]) => void;
   setCameraDebug: (
     position: [number, number, number],
@@ -169,6 +173,7 @@ export const useScrollStore = create<ScrollState>((set) => ({
   scrollCueVisible: false,
   scrollHandoff: null,
   cameraSnapNonce: 0,
+  prologueHomeNonce: 0,
   modelLoadingState: "fallback",
   cameraPosition: [80, 520, 780],
   cameraTarget: [0, 40, 0],
@@ -206,6 +211,8 @@ export const useScrollStore = create<ScrollState>((set) => ({
   setScrollHandoff: (scrollHandoff) => set({ scrollHandoff }),
   requestCameraSnap: () =>
     set((s) => ({ cameraSnapNonce: s.cameraSnapNonce + 1 })),
+  requestPrologueHome: () =>
+    set((s) => ({ prologueHomeNonce: s.prologueHomeNonce + 1 })),
   setModelLoadingState: (modelLoadingState) => set({ modelLoadingState }),
   setCameraDebug: (cameraPosition, cameraTarget) =>
     set({ cameraPosition, cameraTarget }),

@@ -23,6 +23,7 @@ import {
 import { sceneAssets } from "@/config/scene";
 import { useScrollStore } from "@/store/scrollStore";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { isMobileUiViewport } from "@/hooks/useIsMobileUi";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -34,6 +35,8 @@ const AIYLA_STEP = prologueAmbitions.length;
 
 /** Wheel delta needed to fill the side meter and change slide. */
 const STEP_DELTA_THRESHOLD = 520;
+/** Finger travel (px) to fill the meter on touch devices. */
+const TOUCH_DELTA_THRESHOLD = 150;
 /** Key press fills this much of the meter (space / arrows). */
 const KEY_CHARGE = 0.42;
 
@@ -61,6 +64,14 @@ export function PrologueExperience() {
   const setSection = useScrollStore((s) => s.setSection);
   const setCityAwake = useScrollStore((s) => s.setCityAwake);
   const requestCameraSnap = useScrollStore((s) => s.requestCameraSnap);
+  const setTowerTourStepped = useScrollStore((s) => s.setTowerTourStepped);
+  const setStoryBridge = useScrollStore((s) => s.setStoryBridge);
+  const setTowerJourney = useScrollStore((s) => s.setTowerJourney);
+  const setDhsIntensity = useScrollStore((s) => s.setDhsIntensity);
+  const setTrsreIntensity = useScrollStore((s) => s.setTrsreIntensity);
+  const setDoorlyIntensity = useScrollStore((s) => s.setDoorlyIntensity);
+  const setActiveBusinesses = useScrollStore((s) => s.setActiveBusinesses);
+  const prologueHomeNonce = useScrollStore((s) => s.prologueHomeNonce);
 
   const [stage, setStage] = useState<Stage>("loading");
   const [progress, setProgress] = useState(0);
@@ -123,6 +134,12 @@ export function PrologueExperience() {
 
   useEffect(() => {
     let cancelled = false;
+    // iPhone: skip tower preload — loading all GLBs during intro OOMs Safari.
+    if (isMobileUiViewport()) {
+      assetsReadyRef.current = true;
+      return;
+    }
+
     const paths = [
       sceneAssets.manchester,
       ...new Set(
@@ -157,11 +174,12 @@ export function PrologueExperience() {
       return () => window.clearTimeout(t);
     }
 
+    const mobile = isMobileUiViewport();
     let raf = 0;
     let settleTimer = 0;
     const start = performance.now();
-    const minDuration = 3400;
-    const hardTimeout = 14000;
+    const minDuration = mobile ? 1800 : 3400;
+    const hardTimeout = mobile ? 6000 : 14000;
 
     const tick = (now: number) => {
       if (finishedLoad.current) return;
@@ -169,7 +187,10 @@ export function PrologueExperience() {
       const timeProgress = Math.min(1, elapsed / minDuration);
       const cityReady =
         modelRef.current === "ready" || modelRef.current === "fallback";
-      const ready = cityReady && assetsReadyRef.current;
+      // Mobile defers WebGL — don't wait on city/GLB readiness to leave the loader.
+      const ready = mobile
+        ? assetsReadyRef.current
+        : cityReady && assetsReadyRef.current;
 
       let p = Math.floor(timeProgress * (ready ? 100 : 88));
       if (ready && timeProgress >= 1) p = 100;
@@ -185,12 +206,10 @@ export function PrologueExperience() {
 
       if (p >= 100) {
         finishedLoad.current = true;
-        // Keep the canvas warming under the loading UI so towers finish GPU upload
-        // before we freeze the frameloop for the intro cards.
         settleTimer = window.setTimeout(() => {
           setLoaderDone(true);
           setStage("orientation");
-        }, 700);
+        }, mobile ? 200 : 700);
         return;
       }
 
@@ -239,11 +258,37 @@ export function PrologueExperience() {
       }
     };
 
+    let touchY = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      touchY = e.touches[0]?.clientY ?? 0;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const y = e.touches[0]?.clientY ?? touchY;
+      const delta = touchY - y;
+      touchY = y;
+      if (delta <= 0) {
+        chargeRef.current = Math.max(0, chargeRef.current + delta / TOUCH_DELTA_THRESHOLD);
+        syncChargeUi();
+        return;
+      }
+      chargeRef.current += delta / TOUCH_DELTA_THRESHOLD;
+      if (chargeRef.current >= 1) {
+        advance();
+        return;
+      }
+      syncChargeUi();
+    };
+
     window.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("keydown", onKey);
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
     return () => {
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
       if (chargeRaf.current) cancelAnimationFrame(chargeRaf.current);
     };
   }, [stage, syncChargeUi]);
@@ -397,11 +442,29 @@ export function PrologueExperience() {
       }
     };
 
+    let touchY = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      touchY = e.touches[0]?.clientY ?? 0;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const y = e.touches[0]?.clientY ?? touchY;
+      const delta = touchY - y;
+      touchY = y;
+      if (Math.abs(delta) < 1) return;
+      // Convert px → wheel-equivalent charge units
+      applyCharge((delta / TOUCH_DELTA_THRESHOLD) * STEP_DELTA_THRESHOLD);
+    };
+
     const root = rootRef.current;
     root?.addEventListener("wheel", onWheel, { passive: false });
+    root?.addEventListener("touchstart", onTouchStart, { passive: true });
+    root?.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("keydown", onKey);
     return () => {
       root?.removeEventListener("wheel", onWheel);
+      root?.removeEventListener("touchstart", onTouchStart);
+      root?.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("keydown", onKey);
       if (chargeRaf.current) cancelAnimationFrame(chargeRaf.current);
     };
@@ -432,6 +495,67 @@ export function PrologueExperience() {
     setExperienceStarted,
     setSceneMode,
     setScrollCueVisible,
+  ]);
+
+  /** First landing page — orientation after load, before ambition cards. */
+  const openPrologueLanding = useCallback(() => {
+    introTweenRef.current?.kill();
+    introTweenRef.current = null;
+    busyRef.current = false;
+    returningRef.current = false;
+    window.scrollTo(0, 0);
+    setCoverReveal(0);
+    setSceneMode("cover");
+    setAttentionMode("cinematic");
+    setActiveDevelopment(null);
+    setEstateBuildingProgress(0);
+    setDemoIntroLock(false);
+    setScrollCueVisible(false);
+    setStarting(false);
+    setTowerTourStepped(false);
+    setStoryBridge("none");
+    setTowerJourney({
+      towerChapterIndex: 0,
+      towerLocalProgress: 0,
+      towerProfileVisible: false,
+      towerFeatureVisible: false,
+      towerCameraCalm: false,
+      towerCameraSettled: false,
+      towerFeatureStateIndex: 0,
+      towerBeatIndex: 0,
+    });
+    setDhsIntensity(0);
+    setTrsreIntensity(0);
+    setDoorlyIntensity(0);
+    setActiveBusinesses([]);
+    setCityAwake(0);
+    setSection("loader", 0);
+    entryStepRef.current = null;
+    stepRef.current = 0;
+    setStep(0);
+    resetCharge();
+    resumeFadeRef.current = true;
+    setExperienceStarted(false);
+    setStage("orientation");
+  }, [
+    resetCharge,
+    setActiveBusinesses,
+    setActiveDevelopment,
+    setAttentionMode,
+    setCityAwake,
+    setCoverReveal,
+    setDemoIntroLock,
+    setDoorlyIntensity,
+    setDhsIntensity,
+    setEstateBuildingProgress,
+    setExperienceStarted,
+    setSceneMode,
+    setScrollCueVisible,
+    setSection,
+    setStoryBridge,
+    setTowerJourney,
+    setTowerTourStepped,
+    setTrsreIntensity,
   ]);
 
   /** Smoothly settle the demo runway, then snap back onto the last welcome card. */
@@ -465,6 +589,53 @@ export function PrologueExperience() {
       onComplete: open,
     });
   }, [openPrologueAtStart, reduced, setCoverReveal, stage]);
+
+  /** Logo home — return to the first landing from anywhere in the demo/prologue. */
+  const goHomeToLanding = useCallback(() => {
+    if (stage === "loading" || stage === "exiting") return;
+    if (stage === "orientation") {
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (returningRef.current) return;
+    returningRef.current = true;
+
+    const coverReveal = useScrollStore.getState().coverReveal;
+    const scrollY = window.scrollY;
+    const fromDemo = stage === "done";
+
+    const open = () => {
+      openPrologueLanding();
+    };
+
+    if (!fromDemo || reduced || (scrollY < 8 && coverReveal < 0.04)) {
+      open();
+      return;
+    }
+
+    const proxy = { y: scrollY, r: coverReveal };
+    gsap.to(proxy, {
+      y: 0,
+      r: 0,
+      duration: Math.min(1.2, 0.45 + scrollY / 2800 + coverReveal * 0.4),
+      ease: "power2.inOut",
+      overwrite: true,
+      onUpdate: () => {
+        window.scrollTo(0, proxy.y);
+        setCoverReveal(proxy.r);
+      },
+      onComplete: open,
+    });
+  }, [openPrologueLanding, reduced, setCoverReveal, stage]);
+
+  const homeNonceSeen = useRef(0);
+  useEffect(() => {
+    if (prologueHomeNonce === 0) return;
+    if (prologueHomeNonce === homeNonceSeen.current) return;
+    homeNonceSeen.current = prologueHomeNonce;
+    goHomeToLanding();
+  }, [goHomeToLanding, prologueHomeNonce]);
 
   // After the demo is running: at the top of the cover, scroll/key up returns to welcome.
   useEffect(() => {
@@ -516,7 +687,12 @@ export function PrologueExperience() {
 
   // Fade welcome back in after a demo → prologue return.
   useLayoutEffect(() => {
-    if (stage !== "story" || !resumeFadeRef.current) return;
+    if (
+      (stage !== "story" && stage !== "orientation") ||
+      !resumeFadeRef.current
+    ) {
+      return;
+    }
     resumeFadeRef.current = false;
     const root = rootRef.current;
 
@@ -793,7 +969,12 @@ export function PrologueExperience() {
                 className="prologue__ghost-cta mt-12"
                 onClick={() => setStage("story")}
               >
-                {prologueOrientation.continueHint}
+                <span className="prologue__continue--desktop">
+                  {prologueOrientation.continueHint}
+                </span>
+                <span className="prologue__continue--mobile">
+                  Swipe up or tap to continue
+                </span>
               </button>
             </div>
 
@@ -916,7 +1097,16 @@ export function PrologueExperience() {
           </div>
 
           <p className="prologue__step-hint" aria-hidden>
-            {step < AIYLA_STEP ? "Scroll to continue" : "Ready"}
+            {step < AIYLA_STEP ? (
+              <>
+                <span className="prologue__continue--desktop">
+                  Scroll to continue
+                </span>
+                <span className="prologue__continue--mobile">Swipe up</span>
+              </>
+            ) : (
+              "Ready"
+            )}
           </p>
         </div>
       )}
