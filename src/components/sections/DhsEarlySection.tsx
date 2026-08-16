@@ -112,10 +112,25 @@ export function DhsEarlySection() {
     if (!armedRef.current) {
       armedRef.current = true;
       activeRef.current = true;
-      beatRef.current = 0;
-      setBeat(0);
       chargeRef.current = 0;
-      window.scrollTo(0, yForDhsBeat(0));
+
+      // Entering from TRSRE (below) → land on the last card so reverse
+      // scroll walks every beat. Forward from Beyond → start at intro.
+      const bounds = dhsBounds();
+      const fromBelow =
+        bounds != null &&
+        window.scrollY > bounds.top + bounds.range * 0.4;
+      const startBeat = fromBelow ? BEATS - 1 : 0;
+
+      beatRef.current = startBeat;
+      setBeat(startBeat);
+      busyRef.current = true;
+      void animateScrollTo(yForDhsBeat(startBeat), fromBelow ? 0.35 : 0.01).then(
+        () => {
+          busyRef.current = false;
+          chargeRef.current = 0;
+        },
+      );
     }
   }, [inDhs]);
 
@@ -167,6 +182,9 @@ export function DhsEarlySection() {
       setActiveBusinesses([]);
       useScrollStore.getState().setDhsVisionPulse(false);
       useScrollStore.getState().setDhsBreakoutRise(false);
+      // Ensure TRSRE can claim once we leave — no leftover tour lock
+      useScrollStore.getState().setTowerTourStepped(false);
+      useScrollStore.getState().setStoryBridge("none");
 
       const trsre = document.getElementById("section-trsre");
       const y = trsre

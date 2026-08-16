@@ -18,6 +18,26 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+/** True when the viewport mid-point is still inside the DHS section. */
+function scrollStillInDhs() {
+  const dhs = document.getElementById("section-dhs-early");
+  if (!dhs) return false;
+  const mid = window.scrollY + window.innerHeight * 0.45;
+  const top = dhs.offsetTop;
+  const bottom = top + dhs.offsetHeight;
+  return mid >= top && mid < bottom - 8;
+}
+
+/** True when the viewport mid-point is still inside TRSRE. */
+function scrollStillInTrsre() {
+  const el = document.getElementById("section-trsre");
+  if (!el) return false;
+  const mid = window.scrollY + window.innerHeight * 0.45;
+  const top = el.offsetTop;
+  const bottom = top + el.offsetHeight;
+  return mid >= top && mid < bottom - 8;
+}
+
 /**
  * Camera settle progress for a chapter-local 0–1.
  * Never pulls wider after approach — that was causing the DGS “bungee”.
@@ -414,35 +434,80 @@ export function useScrollStory(enabled: boolean) {
       );
     }
 
-    watch("section-trsre", "trsre", (p) => {
-      setSceneMode("trsre");
-      setAttentionMode("editorial");
-      setTrsreIntensity(Math.min(1, 0.15 + p * 0.75));
-      setDhsIntensity(Math.max(0, 0.35 - p * 0.45));
-      setDoorlyIntensity(0);
-    }, { start: "top center", end: "bottom top" });
+    // TRSRE — yield while the viewport mid-point is still in DHS so reverse
+    // scroll can walk every Digital High Street card instead of skipping.
+    const trsreEl = document.getElementById("section-trsre");
+    if (trsreEl) {
+      triggers.push(
+        ScrollTrigger.create({
+          trigger: trsreEl,
+          start: "top center",
+          end: "bottom top",
+          onEnter: () => {
+            if (scrollStillInDhs()) return;
+            setSection("trsre", 0);
+          },
+          onEnterBack: () => {
+            if (scrollStillInDhs()) return;
+            setSection("trsre", 1);
+          },
+          onUpdate: (self) => {
+            if (scrollStillInDhs()) return;
+            setSection("trsre", self.progress);
+            setSceneMode("trsre");
+            setAttentionMode("editorial");
+            setTrsreIntensity(Math.min(1, 0.15 + self.progress * 0.75));
+            setDhsIntensity(Math.max(0, 0.35 - self.progress * 0.45));
+            setDoorlyIntensity(0);
+          },
+        }),
+      );
+    }
 
-    watch(
-      "section-videos",
-      "videos",
-      () => {
-        setSceneMode("quiet");
-        setAttentionMode("editorial");
-        setTrsreIntensity(0);
-        setDhsIntensity(0);
-        setDoorlyIntensity(0);
-        setHaze(0);
-        setOrbReveal(0);
-      },
-      {
-        editorial: true,
-        enterProgress: 0,
-        enterBackProgress: 1,
-        // Wait until TRSRE Impact has cleared — don't steal mid-card
-        start: "top 18%",
-        end: "bottom center",
-      },
-    );
+    // Videos — yield while still in TRSRE so charge-to-advance owns the section
+    const videosEl = document.getElementById("section-videos");
+    if (videosEl) {
+      triggers.push(
+        ScrollTrigger.create({
+          trigger: videosEl,
+          start: "top 18%",
+          end: "bottom center",
+          onEnter: () => {
+            if (scrollStillInTrsre()) return;
+            setSection("videos", 0);
+            setSceneMode("quiet");
+            setAttentionMode("editorial");
+            setTrsreIntensity(0);
+            setDhsIntensity(0);
+            setDoorlyIntensity(0);
+            setHaze(0);
+            setOrbReveal(0);
+          },
+          onEnterBack: () => {
+            if (scrollStillInTrsre()) return;
+            setSection("videos", 1);
+            setSceneMode("quiet");
+            setAttentionMode("editorial");
+            setTrsreIntensity(0);
+            setDhsIntensity(0);
+            setDoorlyIntensity(0);
+            setHaze(0);
+            setOrbReveal(0);
+          },
+          onUpdate: (self) => {
+            if (scrollStillInTrsre()) return;
+            setSection("videos", self.progress);
+            setSceneMode("quiet");
+            setAttentionMode("editorial");
+            setTrsreIntensity(0);
+            setDhsIntensity(0);
+            setDoorlyIntensity(0);
+            setHaze(0);
+            setOrbReveal(0);
+          },
+        }),
+      );
+    }
 
     watch("section-finale", "finale", (p) => {
       setSceneMode("finale");

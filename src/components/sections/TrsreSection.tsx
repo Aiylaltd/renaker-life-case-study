@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import gsap from "gsap";
 import { trsreCopy, trsreImages, trsrePins, trsreVideos } from "@/config/trsre";
 import { trsreProof } from "@/config/metrics";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useScrollStore } from "@/store/scrollStore";
 
 /**
@@ -12,30 +14,80 @@ import { useScrollStore } from "@/store/scrollStore";
  * 3–4 = explore / impact cards
  */
 const BEATS = 5;
+/** Higher than DHS — TRSRE slides are denser and easier to overshoot */
+const STEP_DELTA_THRESHOLD = 640;
+/** Extra hold on the Over 300 + video beat when advancing forward */
+const CODES_FORWARD_THRESHOLD = 920;
+const KEY_CHARGE = 0.35;
 
-function lockedBeat(progress: number, beats: number) {
-  const p = Math.max(0, Math.min(0.999, progress));
-  const scaled = p * beats;
-  const i = Math.min(beats - 1, Math.floor(scaled));
-  return { index: i, local: scaled - i };
+function trsreBounds() {
+  const el = document.getElementById("section-trsre");
+  if (!el) return null;
+  const top = el.offsetTop;
+  const range = Math.max(1, el.offsetHeight - window.innerHeight);
+  return { top, range };
 }
 
+function yForTrsreBeat(index: number) {
+  const bounds = trsreBounds();
+  if (!bounds) return window.scrollY;
+  const t = BEATS <= 1 ? 0 : index / (BEATS - 1);
+  return bounds.top + t * bounds.range;
+}
+
+function animateScrollTo(targetY: number, duration = 0.65) {
+  return new Promise<void>((resolve) => {
+    if (duration <= 0.01) {
+      window.scrollTo(0, targetY);
+      resolve();
+      return;
+    }
+    const proxy = { y: window.scrollY };
+    gsap.to(proxy, {
+      y: targetY,
+      duration,
+      ease: "power3.inOut",
+      overwrite: true,
+      onUpdate: () => window.scrollTo(0, proxy.y),
+      onComplete: () => {
+        window.scrollTo(0, targetY);
+        resolve();
+      },
+    });
+  });
+}
+
+function thresholdForStep(fromBeat: number, direction: 1 | -1) {
+  // Leaving the codes/video beat forward needs a deliberate charge
+  if (direction > 0 && fromBeat === 2) return CODES_FORWARD_THRESHOLD;
+  return STEP_DELTA_THRESHOLD;
+}
+
+/**
+ * TRSRE — charge-to-advance (same feel as DHS / tower tour).
+ */
 export function TrsreSection() {
+  const reduced = useReducedMotion();
   const sectionId = useScrollStore((s) => s.sectionId);
-  const progress = useScrollStore((s) =>
-    s.sectionId === "trsre" ? s.sectionProgress : 0,
-  );
   const setTrsreShowPins = useScrollStore((s) => s.setTrsreShowPins);
+  const [beat, setBeat] = useState(0);
+  const beatRef = useRef(0);
+  const chargeRef = useRef(0);
+  const busyRef = useRef(false);
+  const activeRef = useRef(false);
+  const armedRef = useRef(false);
+  const exitingRef = useRef(false);
+  const touchY = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const inTrsre = sectionId === "trsre";
-  const { index: beat } = lockedBeat(progress, BEATS);
   const showPanel = beat >= 3;
 
   useEffect(() => {
+    beatRef.current = beat;
     setTrsreShowPins(inTrsre && beat >= 1);
     return () => setTrsreShowPins(false);
-  }, [inTrsre, beat, setTrsreShowPins]);
+  }, [beat, inTrsre, setTrsreShowPins]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -43,12 +95,199 @@ export function TrsreSection() {
     if (inTrsre && beat === 2) {
       el.currentTime = 0;
       void el.play().catch(() => {
-        /* autoplay may be blocked until gesture — muted should allow it */
+        /* muted autoplay may still be blocked until gesture */
       });
     } else {
       el.pause();
     }
   }, [inTrsre, beat]);
+
+  useEffect(() => {
+    if (!inTrsre) {
+      activeRef.current = false;
+      armedRef.current = false;
+      exitingRef.current = false;
+      chargeRef.current = 0;
+      return;
+    }
+
+    if (exitingRef.current) return;
+
+    if (!armedRef.current) {
+      armedRef.current = true;
+      activeRef.current = true;
+      chargeRef.current = 0;
+
+      const bounds = trsreBounds();
+      const fromBelow =
+        bounds != null &&
+        window.scrollY > bounds.top + bounds.range * 0.4;
+      const startBeat = fromBelow ? BEATS - 1 : 0;
+
+      beatRef.current = startBeat;
+      setBeat(startBeat);
+      busyRef.current = true;
+      void animateScrollTo(
+        yForTrsreBeat(startBeat),
+        fromBelow ? 0.35 : 0.01,
+      ).then(() => {
+        busyRef.current = false;
+        chargeRef.current = 0;
+      });
+    }
+  }, [inTrsre]);
+
+  useEffect(() => {
+    if (reduced) return;
+
+    const releaseToDhs = async () => {
+      exitingRef.current = true;
+      activeRef.current = false;
+      armedRef.current = false;
+      busyRef.current = true;
+      chargeRef.current = 0;
+      setTrsreShowPins(false);
+
+      const dhs = document.getElementById("section-dhs-early");
+      // Land near the end of DHS so its stepper arms on the last card
+      const y = dhs
+        ? dhs.offsetTop + Math.max(0, dhs.offsetHeight - window.innerHeight) - 8
+        : Math.max(0, window.scrollY - window.innerHeight);
+      await animateScrollTo(y, 0.75);
+      busyRef.current = false;
+      exitingRef.current = false;
+    };
+
+    const releaseToVideos = async () => {
+      exitingRef.current = true;
+      activeRef.current = false;
+      armedRef.current = false;
+      busyRef.current = true;
+      chargeRef.current = 0;
+      setTrsreShowPins(false);
+
+      const videos = document.getElementById("section-videos");
+      const y = videos
+        ? videos.offsetTop + 8
+        : window.scrollY + window.innerHeight;
+      await animateScrollTo(y, 0.85);
+      busyRef.current = false;
+      exitingRef.current = false;
+    };
+
+    const goToBeat = async (next: number) => {
+      if (busyRef.current || exitingRef.current) return;
+
+      if (next < 0) {
+        await releaseToDhs();
+        return;
+      }
+      if (next >= BEATS) {
+        await releaseToVideos();
+        return;
+      }
+
+      busyRef.current = true;
+      chargeRef.current = 0;
+      beatRef.current = next;
+      setBeat(next);
+      await animateScrollTo(yForTrsreBeat(next), 0.75);
+      busyRef.current = false;
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      const sid = useScrollStore.getState().sectionId;
+      if (sid !== "trsre" || exitingRef.current) {
+        activeRef.current = false;
+        return;
+      }
+      if (busyRef.current) {
+        e.preventDefault();
+        return;
+      }
+      if (!activeRef.current) {
+        activeRef.current = true;
+        armedRef.current = true;
+      }
+
+      e.preventDefault();
+
+      const dir: 1 | -1 = e.deltaY >= 0 ? 1 : -1;
+      const threshold = thresholdForStep(beatRef.current, dir);
+      chargeRef.current += e.deltaY / threshold;
+
+      if (chargeRef.current >= 1) {
+        void goToBeat(beatRef.current + 1);
+        return;
+      }
+      if (chargeRef.current <= -1) {
+        void goToBeat(beatRef.current - 1);
+      }
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      const sid = useScrollStore.getState().sectionId;
+      if (sid !== "trsre" || exitingRef.current) return;
+      if (busyRef.current) {
+        e.preventDefault();
+        return;
+      }
+      if (!activeRef.current) {
+        activeRef.current = true;
+        armedRef.current = true;
+      }
+      if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") {
+        e.preventDefault();
+        chargeRef.current += KEY_CHARGE;
+        if (chargeRef.current >= 1) void goToBeat(beatRef.current + 1);
+      }
+      if (e.key === "ArrowUp" || e.key === "PageUp") {
+        e.preventDefault();
+        chargeRef.current -= KEY_CHARGE;
+        if (chargeRef.current <= -1) void goToBeat(beatRef.current - 1);
+      }
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      touchY.current = e.touches[0]?.clientY ?? null;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const sid = useScrollStore.getState().sectionId;
+      if (sid !== "trsre" || exitingRef.current) return;
+      if (busyRef.current) {
+        e.preventDefault();
+        return;
+      }
+      if (!activeRef.current) {
+        activeRef.current = true;
+        armedRef.current = true;
+      }
+      if (touchY.current == null) return;
+      const y = e.touches[0]?.clientY;
+      if (y == null) return;
+      const dy = touchY.current - y;
+      touchY.current = y;
+      e.preventDefault();
+
+      const dir: 1 | -1 = dy >= 0 ? 1 : -1;
+      const threshold = thresholdForStep(beatRef.current, dir) * 0.65;
+      chargeRef.current += dy / threshold;
+      if (chargeRef.current >= 1) void goToBeat(beatRef.current + 1);
+      else if (chargeRef.current <= -1) void goToBeat(beatRef.current - 1);
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [reduced, setTrsreShowPins]);
 
   return (
     <section
