@@ -8,6 +8,7 @@ import { AnchorRegistry } from "@/scene/AnchorRegistry";
 import { cameraDefaults, RENAKER_ANCHORS } from "@/config/scene";
 import { getDevelopmentByAnchor } from "@/config/developments";
 import type { AnchorName } from "@/config/scene";
+import { isMobileUiViewport } from "@/hooks/useIsMobileUi";
 
 const _desiredPos = new THREE.Vector3();
 const _desiredTarget = new THREE.Vector3();
@@ -391,13 +392,17 @@ export function CameraDirector() {
     if (mode === "estate" || mode === "estate-overview") {
       const posDist = camera.position.distanceTo(_desiredPos);
       const lookDist = lookAt.current.distanceTo(_desiredTarget);
-      const closeEnough = posDist < 90 && lookDist < 70;
+      const mobile = isMobileUiViewport();
+      const closeEnough = mobile
+        ? posDist < 160 && lookDist < 120
+        : posDist < 90 && lookDist < 70;
       settledHold.current += dt;
+      const settleAfter = mobile ? 0.35 : 1.1;
       // Distance settle OR time fallback so cards can never get stuck hidden
       if (
         !state.towerCameraSettled &&
-        ((closeEnough && settledHold.current > 0.2) ||
-          settledHold.current > 1.1)
+        ((closeEnough && settledHold.current > 0.15) ||
+          settledHold.current > settleAfter)
       ) {
         setTowerCameraSettled(true);
       }

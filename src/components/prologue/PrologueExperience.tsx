@@ -35,10 +35,61 @@ const AIYLA_STEP = prologueAmbitions.length;
 
 /** Wheel delta needed to fill the side meter and change slide. */
 const STEP_DELTA_THRESHOLD = 520;
-/** Finger travel (px) to fill the meter on touch devices. */
-const TOUCH_DELTA_THRESHOLD = 150;
 /** Key press fills this much of the meter (space / arrows). */
 const KEY_CHARGE = 0.42;
+/** Swipe distance (px) to change slide on touch — iOS-friendly touchend gesture. */
+const SWIPE_ADVANCE_PX = 42;
+
+function attachTouchSwipe(
+  target: HTMLElement | Window,
+  handlers: {
+    onSwipeUp: () => void;
+    onSwipeDown?: () => void;
+  },
+) {
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+
+  const onStart = (e: Event) => {
+    const te = e as TouchEvent;
+    if (te.touches.length !== 1) {
+      tracking = false;
+      return;
+    }
+    const t = te.touches[0];
+    startX = t.clientX;
+    startY = t.clientY;
+    tracking = true;
+  };
+
+  const onEnd = (e: Event) => {
+    if (!tracking) return;
+    tracking = false;
+    const te = e as TouchEvent;
+    const t = te.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - startX;
+    const dy = startY - t.clientY; // up = positive
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 36) return;
+    if (dy >= SWIPE_ADVANCE_PX) handlers.onSwipeUp();
+    else if (dy <= -SWIPE_ADVANCE_PX) handlers.onSwipeDown?.();
+  };
+
+  const onCancel = () => {
+    tracking = false;
+  };
+
+  target.addEventListener("touchstart", onStart, { passive: true, capture: true });
+  target.addEventListener("touchend", onEnd, { passive: true, capture: true });
+  target.addEventListener("touchcancel", onCancel, { passive: true, capture: true });
+
+  return () => {
+    target.removeEventListener("touchstart", onStart, true);
+    target.removeEventListener("touchend", onEnd, true);
+    target.removeEventListener("touchcancel", onCancel, true);
+  };
+}
 
 /**
  * HTML/CSS prologue above the persistent V1 canvas.
@@ -258,37 +309,15 @@ export function PrologueExperience() {
       }
     };
 
-    let touchY = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      touchY = e.touches[0]?.clientY ?? 0;
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
-      const y = e.touches[0]?.clientY ?? touchY;
-      const delta = touchY - y;
-      touchY = y;
-      if (delta <= 0) {
-        chargeRef.current = Math.max(0, chargeRef.current + delta / TOUCH_DELTA_THRESHOLD);
-        syncChargeUi();
-        return;
-      }
-      chargeRef.current += delta / TOUCH_DELTA_THRESHOLD;
-      if (chargeRef.current >= 1) {
-        advance();
-        return;
-      }
-      syncChargeUi();
-    };
+    // iOS: touchmove charge is unreliable with overflow:hidden — use swipe-end.
+    const detachSwipe = attachTouchSwipe(window, { onSwipeUp: advance });
 
     window.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("keydown", onKey);
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
     return () => {
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
+      detachSwipe();
       if (chargeRaf.current) cancelAnimationFrame(chargeRaf.current);
     };
   }, [stage, syncChargeUi]);
@@ -442,30 +471,25 @@ export function PrologueExperience() {
       }
     };
 
-    let touchY = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      touchY = e.touches[0]?.clientY ?? 0;
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
-      const y = e.touches[0]?.clientY ?? touchY;
-      const delta = touchY - y;
-      touchY = y;
-      if (Math.abs(delta) < 1) return;
-      // Convert px → wheel-equivalent charge units
-      applyCharge((delta / TOUCH_DELTA_THRESHOLD) * STEP_DELTA_THRESHOLD);
-    };
+    const detachSwipe = attachTouchSwipe(window, {
+      onSwipeUp: () => {
+        if (busyRef.current) return;
+        if (stepRef.current >= AIYLA_STEP) return;
+        goToStep(stepRef.current + 1);
+      },
+      onSwipeDown: () => {
+        if (busyRef.current) return;
+        goToStep(stepRef.current - 1);
+      },
+    });
 
     const root = rootRef.current;
     root?.addEventListener("wheel", onWheel, { passive: false });
-    root?.addEventListener("touchstart", onTouchStart, { passive: true });
-    root?.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("keydown", onKey);
     return () => {
       root?.removeEventListener("wheel", onWheel);
-      root?.removeEventListener("touchstart", onTouchStart);
-      root?.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("keydown", onKey);
+      detachSwipe();
       if (chargeRaf.current) cancelAnimationFrame(chargeRaf.current);
     };
   }, [goToStep, resetCharge, stage, syncChargeUi]);
@@ -767,6 +791,7 @@ export function PrologueExperience() {
     introTweenRef.current = null;
 
     const { p, targetY, targetReveal } = cityScrollTarget();
+    const mobile = isMobileUiViewport();
     const startProgress = Math.max(0.12, p - 0.045);
 
     window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
@@ -781,12 +806,22 @@ export function PrologueExperience() {
     setScrollCueVisible(false);
     requestCameraSnap();
 
+    const unlock = () => {
+      introTweenRef.current = null;
+      window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
+      setDemoIntroLock(false);
+      setScrollCueVisible(true);
+    };
+
+    // Hard safety — never leave iPhone scroll locked if a tween aborts.
+    const safety = window.setTimeout(unlock, mobile ? 1600 : 3200);
+
     if (reduced) {
+      window.clearTimeout(safety);
       setSection("cover", p);
       setCoverReveal(targetReveal);
       setCityAwake(p * 0.55);
-      setDemoIntroLock(false);
-      setScrollCueVisible(true);
+      unlock();
       return;
     }
 
@@ -795,7 +830,7 @@ export function PrologueExperience() {
       reveal: targetReveal,
       progress: p,
       awake: p * 0.55,
-      duration: 1.7,
+      duration: mobile ? 0.75 : 1.7,
       ease: "power2.out",
       overwrite: true,
       onUpdate: () => {
@@ -804,10 +839,8 @@ export function PrologueExperience() {
         setCityAwake(proxy.awake);
       },
       onComplete: () => {
-        introTweenRef.current = null;
-        window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
-        setDemoIntroLock(false);
-        setScrollCueVisible(true);
+        window.clearTimeout(safety);
+        unlock();
       },
     });
   }, [
@@ -966,14 +999,14 @@ export function PrologueExperience() {
               </p>
               <button
                 type="button"
-                className="prologue__ghost-cta mt-12"
+                className="prologue__ghost-cta prologue__ghost-cta--inline mt-12"
                 onClick={() => setStage("story")}
               >
                 <span className="prologue__continue--desktop">
                   {prologueOrientation.continueHint}
                 </span>
                 <span className="prologue__continue--mobile">
-                  Swipe up or tap to continue
+                  Swipe up or tap Continue
                 </span>
               </button>
             </div>
@@ -993,6 +1026,17 @@ export function PrologueExperience() {
                 </li>
               ))}
             </ul>
+          </div>
+
+          <div className="prologue__mobile-dock">
+            <button
+              type="button"
+              className="prologue__mobile-dock__btn"
+              onClick={() => setStage("story")}
+            >
+              Continue
+            </button>
+            <p className="prologue__mobile-dock__hint">Or swipe up</p>
           </div>
         </div>
       )}
@@ -1108,6 +1152,19 @@ export function PrologueExperience() {
               "Ready"
             )}
           </p>
+
+          {step < AIYLA_STEP ? (
+            <div className="prologue__mobile-dock prologue__mobile-dock--story">
+              <button
+                type="button"
+                className="prologue__mobile-dock__btn"
+                onClick={() => goToStep(step + 1)}
+              >
+                Continue
+              </button>
+              <p className="prologue__mobile-dock__hint">Or swipe up</p>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
