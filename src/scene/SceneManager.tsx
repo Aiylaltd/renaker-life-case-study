@@ -131,6 +131,8 @@ function DeferredOverlays({
   maxDhsPaths: number;
   maxTrsrePins: number;
 }) {
+  const profile = useScrollStore((s) => s.qualityProfile);
+  const light = profile !== "desktop";
   const [layer, setLayer] = useState<"none" | "dhs" | "doorly" | "trsre" | "finale">(
     "none",
   );
@@ -143,18 +145,26 @@ function DeferredOverlays({
       else if (s.sceneMode === "trsre" || s.trsreIntensity > 0.05) next = "trsre";
       else if (s.sceneMode === "doorly" || s.doorlyIntensity > 0.05) next = "doorly";
       else if (s.sceneMode === "dhs" || s.dhsIntensity > 0.05) next = "dhs";
-      setLayer((prev) => (rank[next] >= rank[prev] ? next : prev));
+      // Mobile: allow overlays to step down so DHS tubes don't stay resident.
+      setLayer((prev) =>
+        light ? next : rank[next] >= rank[prev] ? next : prev,
+      );
     });
-  }, []);
+  }, [light]);
 
   if (layer === "none") return null;
 
+  const showDhs =
+    layer === "dhs" ||
+    (!light &&
+      (layer === "doorly" || layer === "trsre" || layer === "finale"));
+
   return (
     <>
-      {(layer === "dhs" || layer === "doorly" || layer === "trsre" || layer === "finale") && (
-        <DigitalHighStreetPaths maxPaths={maxDhsPaths} />
+      {showDhs && <DigitalHighStreetPaths maxPaths={maxDhsPaths} />}
+      {(layer === "doorly" || layer === "trsre" || layer === "finale") && (
+        <DoorlyRoutes />
       )}
-      {(layer === "doorly" || layer === "trsre" || layer === "finale") && <DoorlyRoutes />}
       {(layer === "trsre" || layer === "finale") && (
         <>
           <Suspense fallback={null}>

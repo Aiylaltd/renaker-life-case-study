@@ -17,6 +17,7 @@ import { useScrollStore } from "@/store/scrollStore";
 import { brand } from "@/config/caseStudy";
 import { RenakerLifeLogo } from "@/components/ui/RenakerLifeLogo";
 import { TowerCaseNav } from "@/components/tower/TowerCaseNav";
+import { DemoStepControls } from "@/components/ui/DemoStepControls";
 import { SceneCanvas } from "@/scene/SceneCanvas";
 
 export function CaseStudyPage() {
@@ -42,15 +43,16 @@ export function CaseStudyPage() {
       <CoverVeil />
       <DemoScrollCue />
       <BeyondBridgeOverlay />
+      <DemoStepControls />
       <DebugOverlay />
 
       <header className="pointer-events-none fixed left-0 right-0 top-0 z-20 px-5 py-5 md:px-8">
         <div className="container-wide flex items-center justify-between gap-6">
-          <div className="flex min-w-0 flex-1 items-center gap-6 md:gap-10">
+          <div className="flex min-w-0 flex-1 items-center gap-4 md:gap-10">
             <button
               type="button"
               onClick={() => requestPrologueHome()}
-              className="pointer-events-auto w-[min(42vw,11.5rem)] shrink-0 mix-blend-difference border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-80"
+              className="pointer-events-auto w-[min(36vw,11.5rem)] shrink-0 mix-blend-difference border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-80 md:w-[min(42vw,11.5rem)]"
               aria-label="Back to Renaker Life start"
             >
               <RenakerLifeLogo variant="light" />

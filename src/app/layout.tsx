@@ -28,9 +28,9 @@ export const metadata: Metadata = {
     images: [
       {
         url: seo.ogImage,
-        width: 1200,
-        height: 630,
-        alt: "Renaker Life — connected living across Manchester",
+        width: 1024,
+        height: 537,
+        alt: "Renaker Life — Seven developments. One connected estate.",
       },
     ],
     type: "website",

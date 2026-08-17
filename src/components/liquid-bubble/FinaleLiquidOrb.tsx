@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { OrbFallback } from "./orb-fallback";
+import { useIsMobileUi } from "@/hooks/useIsMobileUi";
 
 const LiquidBubbleCanvas = dynamic(
   () =>
@@ -27,8 +28,8 @@ function supportsWebGL() {
 
 /** Keep the WebGL orb mounted once warm — remounting is what caused flicker. */
 export function FinaleLiquidOrb({ active }: { active: boolean }) {
+  const mobileUi = useIsMobileUi();
   const [enable3D, setEnable3D] = useState(false);
-  const [mobile, setMobile] = useState(false);
   const [warmed, setWarmed] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -37,14 +38,18 @@ export function FinaleLiquidOrb({ active }: { active: boolean }) {
   }, [active]);
 
   useEffect(() => {
+    // Second WebGL context + main city scene OOMs many iPhones — CSS orb only.
+    if (mobileUi) {
+      setEnable3D(false);
+      return;
+    }
     const update = () => {
-      setMobile(window.innerWidth < 768);
       setEnable3D(!failed && supportsWebGL());
     };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, [failed]);
+  }, [failed, mobileUi]);
 
   const showCanvas = enable3D && warmed;
 
@@ -58,7 +63,7 @@ export function FinaleLiquidOrb({ active }: { active: boolean }) {
         {showCanvas ? (
           <LiquidBubbleCanvas
             mergeProgress={1}
-            mobile={mobile}
+            mobile={false}
             interactive={false}
             className="absolute inset-0 h-full w-full"
             onContextLost={() => setFailed(true)}

@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { AnchorRegistry } from "@/scene/AnchorRegistry";
 import { cityWorldScale, sceneAssets } from "@/config/scene";
 import { useScrollStore } from "@/store/scrollStore";
+import { isMobileUiViewport } from "@/hooks/useIsMobileUi";
 
 const MATS = {
   building: new THREE.MeshLambertMaterial({ color: "#f0ebe3" }),
@@ -96,7 +97,7 @@ export function ManchesterModel() {
   const qualityProfile = useScrollStore((s) => s.qualityProfile);
   const gltf = useGLTF(sceneAssets.manchester);
   const groupRef = useRef<THREE.Group>(null);
-  const showDenseDetail = qualityProfile === "desktop";
+  const showDenseDetail = qualityProfile === "desktop" && !isMobileUiViewport();
 
   const prepared = useMemo(() => {
     const root = gltf.scene.clone(true);
@@ -147,12 +148,14 @@ export function ManchesterModel() {
     AnchorRegistry.ingestScene(group, true);
 
     // Remove the beige OSM stand-ins sitting under / beside Castle Wharf.
-    // Nearest OSM building tris sit ~48m from the empty — clear a bit past that.
-    const cw = AnchorRegistry.getPosition("ANCHOR_CW");
-    carveBuildingsNearPoint(group, cw, 80);
+    // Desktop only — toNonIndexed() spikes RAM and contributes to iPhone OOM.
+    if (qualityProfile === "desktop" && !isMobileUiViewport()) {
+      const cw = AnchorRegistry.getPosition("ANCHOR_CW");
+      carveBuildingsNearPoint(group, cw, 80);
+    }
 
     setModelLoadingState("ready");
-  }, [prepared, setModelLoadingState]);
+  }, [prepared, setModelLoadingState, qualityProfile]);
 
   return (
     <group ref={groupRef} scale={cityWorldScale} name="manchester-city">

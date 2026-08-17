@@ -127,6 +127,15 @@ interface ScrollState {
    */
   scrollHandoff: SectionId | null;
   setScrollHandoff: (v: SectionId | null) => void;
+  /**
+   * Expo / iPad demo controls — bump nonce with dir ±1; active steppers advance one beat.
+   */
+  demoStepNonce: number;
+  demoStepDir: 1 | -1;
+  requestDemoStep: (dir: 1 | -1) => void;
+  /** Prologue Start CTA is showing — hide demo Next so they use the real CTA */
+  prologueAwaitingStart: boolean;
+  setPrologueAwaitingStart: (v: boolean) => void;
   requestCameraSnap: () => void;
   /** Return to the first prologue landing page */
   requestPrologueHome: () => void;
@@ -172,6 +181,9 @@ export const useScrollStore = create<ScrollState>((set) => ({
   demoIntroLock: false,
   scrollCueVisible: false,
   scrollHandoff: null,
+  demoStepNonce: 0,
+  demoStepDir: 1,
+  prologueAwaitingStart: false,
   cameraSnapNonce: 0,
   prologueHomeNonce: 0,
   modelLoadingState: "fallback",
@@ -209,6 +221,13 @@ export const useScrollStore = create<ScrollState>((set) => ({
   setDemoIntroLock: (demoIntroLock) => set({ demoIntroLock }),
   setScrollCueVisible: (scrollCueVisible) => set({ scrollCueVisible }),
   setScrollHandoff: (scrollHandoff) => set({ scrollHandoff }),
+  requestDemoStep: (demoStepDir) =>
+    set((s) => ({
+      demoStepDir,
+      demoStepNonce: s.demoStepNonce + 1,
+    })),
+  setPrologueAwaitingStart: (prologueAwaitingStart) =>
+    set({ prologueAwaitingStart }),
   requestCameraSnap: () =>
     set((s) => ({ cameraSnapNonce: s.cameraSnapNonce + 1 })),
   requestPrologueHome: () =>

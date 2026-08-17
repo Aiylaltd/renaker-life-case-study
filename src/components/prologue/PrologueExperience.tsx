@@ -23,7 +23,7 @@ import {
 import { sceneAssets } from "@/config/scene";
 import { useScrollStore } from "@/store/scrollStore";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
-import { isMobileUiViewport } from "@/hooks/useIsMobileUi";
+import { isMobileUiViewport, isTabletUiViewport } from "@/hooks/useIsMobileUi";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -123,6 +123,9 @@ export function PrologueExperience() {
   const setDoorlyIntensity = useScrollStore((s) => s.setDoorlyIntensity);
   const setActiveBusinesses = useScrollStore((s) => s.setActiveBusinesses);
   const prologueHomeNonce = useScrollStore((s) => s.prologueHomeNonce);
+  const setPrologueAwaitingStart = useScrollStore(
+    (s) => s.setPrologueAwaitingStart,
+  );
 
   const [stage, setStage] = useState<Stage>("loading");
   const [progress, setProgress] = useState(0);
@@ -166,6 +169,13 @@ export function PrologueExperience() {
     setAttentionMode("cinematic");
   }, [stage, setAttentionMode, setCoverReveal, setSceneMode]);
 
+  // iPad demo: hide Next on the Start CTA slide
+  useEffect(() => {
+    const awaiting = stage === "story" && step >= AIYLA_STEP;
+    setPrologueAwaitingStart(awaiting);
+    return () => setPrologueAwaitingStart(false);
+  }, [stage, step, setPrologueAwaitingStart]);
+
   useEffect(() => {
     if (stage === "done") return;
     const html = document.documentElement;
@@ -186,6 +196,7 @@ export function PrologueExperience() {
   useEffect(() => {
     let cancelled = false;
     // iPhone: skip tower preload — loading all GLBs during intro OOMs Safari.
+    // iPad keeps desktop preload (towers stay in scene like desktop).
     if (isMobileUiViewport()) {
       assetsReadyRef.current = true;
       return;
@@ -751,37 +762,6 @@ export function PrologueExperience() {
     };
   }, []);
 
-  /** Instant land on the city frame (used when returning from demo). */
-  const openAtCityView = useCallback(() => {
-    introTweenRef.current?.kill();
-    introTweenRef.current = null;
-
-    const { p, targetY, targetReveal } = cityScrollTarget();
-    window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
-    setSection("cover", p);
-    setCoverReveal(targetReveal);
-    setSceneMode("reveal");
-    setCityAwake(p * 0.55);
-    setAttentionMode("cinematic");
-    setActiveDevelopment(null);
-    setEstateBuildingProgress(0);
-    setDemoIntroLock(false);
-    setScrollCueVisible(true);
-    requestCameraSnap();
-  }, [
-    cityScrollTarget,
-    requestCameraSnap,
-    setActiveDevelopment,
-    setAttentionMode,
-    setCityAwake,
-    setCoverReveal,
-    setDemoIntroLock,
-    setEstateBuildingProgress,
-    setSceneMode,
-    setScrollCueVisible,
-    setSection,
-  ]);
-
   /**
    * Start handoff: camera already on the city frame, veil fades from black,
    * with a very slight forward drift — no fly-in from elsewhere.
@@ -791,7 +771,7 @@ export function PrologueExperience() {
     introTweenRef.current = null;
 
     const { p, targetY, targetReveal } = cityScrollTarget();
-    const mobile = isMobileUiViewport();
+    const lightWake = isMobileUiViewport() || isTabletUiViewport();
     const startProgress = Math.max(0.12, p - 0.045);
 
     window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
@@ -813,8 +793,8 @@ export function PrologueExperience() {
       setScrollCueVisible(true);
     };
 
-    // Hard safety — never leave iPhone scroll locked if a tween aborts.
-    const safety = window.setTimeout(unlock, mobile ? 1600 : 3200);
+    // Hard safety — never leave touch scroll locked if a tween aborts.
+    const safety = window.setTimeout(unlock, lightWake ? 1600 : 3200);
 
     if (reduced) {
       window.clearTimeout(safety);
@@ -830,7 +810,7 @@ export function PrologueExperience() {
       reveal: targetReveal,
       progress: p,
       awake: p * 0.55,
-      duration: mobile ? 0.75 : 1.7,
+      duration: lightWake ? 0.75 : 1.7,
       ease: "power2.out",
       overwrite: true,
       onUpdate: () => {
@@ -901,6 +881,34 @@ export function PrologueExperience() {
     starting,
     wakeIntoCityView,
   ]);
+
+  /** iPad expo Back / Next — same beats as swipe / wheel. */
+  useEffect(() => {
+    if (stage === "loading" || stage === "exiting" || stage === "done") return;
+
+    let lastDemoNonce = useScrollStore.getState().demoStepNonce;
+    return useScrollStore.subscribe((s) => {
+      if (s.demoStepNonce === lastDemoNonce) return;
+      lastDemoNonce = s.demoStepNonce;
+      if (s.experienceStarted) return;
+
+      const dir = s.demoStepDir;
+      if (stage === "orientation") {
+        if (dir > 0) setStage("story");
+        return;
+      }
+      if (stage !== "story") return;
+      if (busyRef.current) return;
+
+      if (dir > 0) {
+        // Start CTA — only the real button starts (Next is hidden)
+        if (stepRef.current >= AIYLA_STEP) return;
+        goToStep(stepRef.current + 1);
+        return;
+      }
+      goToStep(stepRef.current - 1);
+    });
+  }, [goToStep, stage]);
 
   // Hold scroll while the start veil / wake-in is running.
   useEffect(() => {

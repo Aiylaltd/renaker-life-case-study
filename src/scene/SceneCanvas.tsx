@@ -39,6 +39,13 @@ export function SceneCanvas() {
   const sectionId = useScrollStore((s) => s.sectionId);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  // Wait until mobile detection has run (same tick as useIsMobileUi effect).
+  const [viewportReady, setViewportReady] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setViewportReady(true);
+  }, []);
 
   // Desktop: warm city under the loading veil.
   // Mobile: defer WebGL until Start — preloading ~33MB GLBs crashes many iPhones.
@@ -47,11 +54,8 @@ export function SceneCanvas() {
     : !loaderDone || experienceStarted;
   const editorialHold = sectionId === "videos";
   const runScene = warmScene && !editorialHold;
-  const mountCanvas = !mobileUi || experienceStarted;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mountCanvas =
+    viewportReady && (!mobileUi || experienceStarted);
 
   if (!mounted) {
     return <div className="scene-canvas" aria-hidden />;

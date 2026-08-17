@@ -36,6 +36,10 @@ function makeCurve(from: THREE.Vector3, to: THREE.Vector3) {
 export function DigitalHighStreetPaths({ maxPaths = 6 }: { maxPaths?: number }) {
   const intensity = useScrollStore((s) => s.dhsIntensity);
   const active = useScrollStore((s) => s.activeBusinesses);
+  const profile = useScrollStore((s) => s.qualityProfile);
+  const light = profile !== "desktop";
+  const tubeSegs = light ? 16 : 48;
+  const tubeRadial = light ? 4 : 6;
 
   const paths = useMemo(() => {
     const origin = AnchorRegistry.getPosition("ANCHOR_DGS");
@@ -54,36 +58,55 @@ export function DigitalHighStreetPaths({ maxPaths = 6 }: { maxPaths?: number }) 
       {paths.map(({ name, curve }) => {
         const lit = active.includes(name);
         const focused = active.length === 1 && lit;
+        const opacity = 0.28 + intensity * 0.4 + (focused ? 0.35 : 0);
+        const emissiveBoost =
+          0.25 + intensity * 0.55 + (focused ? 1.1 : lit ? 0.45 : 0);
         return (
           <mesh key={name}>
             <tubeGeometry
-              args={[curve, 48, focused ? 1.8 : lit ? 1.2 : 0.7, 6, false]}
+              args={[
+                curve,
+                tubeSegs,
+                focused ? 1.8 : lit ? 1.2 : 0.7,
+                tubeRadial,
+                false,
+              ]}
             />
-            <meshStandardMaterial
-              color="#7c3aed"
-              emissive="#8b5cf6"
-              emissiveIntensity={
-                0.25 + intensity * 0.55 + (focused ? 1.1 : lit ? 0.45 : 0)
-              }
-              transparent
-              opacity={0.28 + intensity * 0.4 + (focused ? 0.35 : 0)}
-              roughness={0.35}
-            />
+            {light ? (
+              <meshBasicMaterial
+                color="#8b5cf6"
+                transparent
+                opacity={opacity}
+                depthWrite={false}
+              />
+            ) : (
+              <meshStandardMaterial
+                color="#7c3aed"
+                emissive="#8b5cf6"
+                emissiveIntensity={emissiveBoost}
+                transparent
+                opacity={opacity}
+                roughness={0.35}
+              />
+            )}
           </mesh>
         );
       })}
-      <DigitalHighStreetHotspots />
-      <DhsVisionPulses />
+      <DigitalHighStreetHotspots light={light} />
+      <DhsVisionPulses light={light} />
     </group>
   );
 }
 
 /** Purple building glow for focused / soft partner pins. */
-function DigitalHighStreetHotspots() {
+function DigitalHighStreetHotspots({ light }: { light: boolean }) {
   const intensity = useScrollStore((s) => s.dhsIntensity);
   const active = useScrollStore((s) => s.activeBusinesses);
   const visionPulse = useScrollStore((s) => s.dhsVisionPulse);
   const focused = active.length === 1 ? active[0] : null;
+  const circleSegs = light ? 20 : 40;
+  const cylSegs = light ? 12 : 28;
+  const sphereSegs = light ? 10 : 20;
 
   if (intensity < 0.05 || visionPulse) return null;
 
@@ -102,7 +125,7 @@ function DigitalHighStreetHotspots() {
               position={[0, 1.2, 0]}
               renderOrder={2}
             >
-              <circleGeometry args={[on ? 42 : 22, 40]} />
+              <circleGeometry args={[on ? 42 : 22, circleSegs]} />
               <meshBasicMaterial
                 color="#8b5cf6"
                 transparent
@@ -113,7 +136,14 @@ function DigitalHighStreetHotspots() {
 
             <mesh position={[0, on ? 28 : 16, 0]} renderOrder={2}>
               <cylinderGeometry
-                args={[on ? 22 : 12, on ? 30 : 16, on ? 56 : 32, 28, 1, true]}
+                args={[
+                  on ? 22 : 12,
+                  on ? 30 : 16,
+                  on ? 56 : 32,
+                  cylSegs,
+                  1,
+                  true,
+                ]}
               />
               <meshBasicMaterial
                 color="#7c3aed"
@@ -125,15 +155,23 @@ function DigitalHighStreetHotspots() {
             </mesh>
 
             <mesh position={[0, on ? 18 : 10, 0]}>
-              <sphereGeometry args={[on ? 5.5 : 3.2, 20, 20]} />
-              <meshStandardMaterial
-                color="#c4b5fd"
-                emissive="#8b5cf6"
-                emissiveIntensity={on ? 2.4 : 0.7}
-                transparent
-                opacity={on ? 0.95 : 0.45}
-                roughness={0.25}
-              />
+              <sphereGeometry args={[on ? 5.5 : 3.2, sphereSegs, sphereSegs]} />
+              {light ? (
+                <meshBasicMaterial
+                  color="#c4b5fd"
+                  transparent
+                  opacity={on ? 0.95 : 0.45}
+                />
+              ) : (
+                <meshStandardMaterial
+                  color="#c4b5fd"
+                  emissive="#8b5cf6"
+                  emissiveIntensity={on ? 2.4 : 0.7}
+                  transparent
+                  opacity={on ? 0.95 : 0.45}
+                  roughness={0.25}
+                />
+              )}
             </mesh>
           </group>
         );
@@ -146,22 +184,27 @@ function DigitalHighStreetHotspots() {
  * Beat 4 — staggered purple pulses at scattered city points
  * while the illustrative query list plays.
  */
-function DhsVisionPulses() {
+function DhsVisionPulses({ light }: { light: boolean }) {
   const active = useScrollStore((s) => s.dhsVisionPulse);
   const group = useRef<THREE.Group>(null);
   const mats = useRef<THREE.MeshBasicMaterial[]>([]);
-  const cores = useRef<THREE.MeshStandardMaterial[]>([]);
+  const cores = useRef<(THREE.MeshBasicMaterial | THREE.MeshStandardMaterial)[]>(
+    [],
+  );
 
   const points = useMemo(() => {
     const origin = AnchorRegistry.getPosition("ANCHOR_DGS");
-    return VISION_PULSE_OFFSETS.map(([dx, dz], i) => ({
+    const offsets = light
+      ? VISION_PULSE_OFFSETS.slice(0, 4)
+      : VISION_PULSE_OFFSETS;
+    return offsets.map(([dx, dz], i) => ({
       id: `pulse-${i}`,
       x: origin.x + dx,
       z: origin.z + dz,
-      phase: (i * 0.73) % Math.PI * 2,
+      phase: ((i * 0.73) % Math.PI) * 2,
       speed: 1.1 + (i % 5) * 0.22,
     }));
-  }, []);
+  }, [light]);
 
   useFrame(({ clock }) => {
     if (!active || !group.current) return;
@@ -178,7 +221,9 @@ function DhsVisionPulses() {
       }
       if (core) {
         core.opacity = 0.2 + pulse * 0.75;
-        core.emissiveIntensity = 0.4 + pulse * 2.2;
+        if ("emissiveIntensity" in core) {
+          core.emissiveIntensity = 0.4 + pulse * 2.2;
+        }
       }
       const scale = 0.55 + pulse * 1.15;
       child.scale.setScalar(scale);
@@ -186,6 +231,9 @@ function DhsVisionPulses() {
   });
 
   if (!active) return null;
+
+  const circleSegs = light ? 18 : 36;
+  const sphereSegs = light ? 8 : 16;
 
   return (
     <group ref={group}>
@@ -196,7 +244,7 @@ function DhsVisionPulses() {
             position={[0, 1.4, 0]}
             renderOrder={2}
           >
-            <circleGeometry args={[36, 36]} />
+            <circleGeometry args={[36, circleSegs]} />
             <meshBasicMaterial
               ref={(m) => {
                 if (m) mats.current[i] = m;
@@ -208,18 +256,29 @@ function DhsVisionPulses() {
             />
           </mesh>
           <mesh position={[0, 14, 0]}>
-            <sphereGeometry args={[4.2, 16, 16]} />
-            <meshStandardMaterial
-              ref={(m) => {
-                if (m) cores.current[i] = m;
-              }}
-              color="#c4b5fd"
-              emissive="#8b5cf6"
-              emissiveIntensity={1}
-              transparent
-              opacity={0.55}
-              roughness={0.3}
-            />
+            <sphereGeometry args={[4.2, sphereSegs, sphereSegs]} />
+            {light ? (
+              <meshBasicMaterial
+                ref={(m) => {
+                  if (m) cores.current[i] = m;
+                }}
+                color="#c4b5fd"
+                transparent
+                opacity={0.55}
+              />
+            ) : (
+              <meshStandardMaterial
+                ref={(m) => {
+                  if (m) cores.current[i] = m;
+                }}
+                color="#c4b5fd"
+                emissive="#8b5cf6"
+                emissiveIntensity={1}
+                transparent
+                opacity={0.55}
+                roughness={0.3}
+              />
+            )}
           </mesh>
         </group>
       ))}

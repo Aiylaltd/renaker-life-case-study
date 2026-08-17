@@ -2,7 +2,8 @@ export const seo = {
   title: "Renaker Life — Connected Living Across Manchester | Aiyla",
   description:
     "How Renaker is creating one connected resident experience across Manchester — buildings, neighbourhood and city — powered by Aiyla.",
-  ogImage: "/images/og/renaker-life-og.svg",
+  ogImage: "/case-studies/renaker-life/images/og/renaker-life-og.jpg",
+  /** Must match next.config basePath */
   url: "https://aiyla.co.uk/case-studies/renaker-life",
   siteName: "Aiyla",
 };

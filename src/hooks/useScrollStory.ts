@@ -30,6 +30,8 @@ function scrollStillInDhs() {
 
 /** True when the viewport mid-point is still inside TRSRE. */
 function scrollStillInTrsre() {
+  const store = useScrollStore.getState();
+  if (store.scrollHandoff === "trsre") return true;
   const el = document.getElementById("section-trsre");
   if (!el) return false;
   const mid = window.scrollY + window.innerHeight * 0.45;
@@ -157,6 +159,8 @@ export function useScrollStory(enabled: boolean) {
           onUpdate: (self) => {
             // Start handoff owns coverReveal / camera while the veil wakes in
             if (useScrollStore.getState().demoIntroLock) return;
+            // Stepped estate tour owns cards — cover ST must not wipe them
+            if (useScrollStore.getState().towerTourStepped) return;
 
             const p = self.progress;
             const reveal = clamp01(p * 1.15);
@@ -202,6 +206,7 @@ export function useScrollStory(enabled: boolean) {
           onLeave: () => {
             setCoverReveal(1);
             setCityAwake(0.6);
+            if (useScrollStore.getState().towerTourStepped) return;
             // Hand off already aimed at DGS — keep active so estate never falls through
             if (firstTower) {
               setSceneMode("estate");
@@ -245,6 +250,11 @@ export function useScrollStory(enabled: boolean) {
             setCoverReveal(1);
             if (reduced) {
               setSceneMode("quiet");
+              return;
+            }
+            // Stepped tour already owns beat/card state — don't reset to arrive
+            if (useScrollStore.getState().towerTourStepped) {
+              setSceneMode("estate");
               return;
             }
             const tower =

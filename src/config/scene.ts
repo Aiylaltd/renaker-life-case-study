@@ -153,15 +153,15 @@ export const qualityProfiles = {
   mobile: {
     dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 12,
-    maxDhsPaths: 2,
+    maxTrsrePins: 8,
+    maxDhsPaths: 1,
     postprocessing: false,
     cityDensity: 0.55,
   },
   reduced: {
     dpr: 1 as number | [number, number],
     shadows: false,
-    maxTrsrePins: 10,
+    maxTrsrePins: 6,
     maxDhsPaths: 1,
     postprocessing: false,
     cityDensity: 0.4,

@@ -46,3 +46,6 @@ export const videoStories: VideoStoryConfig[] = [
     durationNote: "Awaiting final cut",
   },
 ];
+
+/** Stories ready to show — hides placeholder cards with no filmed asset. */
+export const publishedVideoStories = videoStories.filter((v) => Boolean(v.src));

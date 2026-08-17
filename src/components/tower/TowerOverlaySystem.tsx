@@ -3,6 +3,7 @@
 import { towerChapters } from "@/config/towerChapters";
 import { TowerDevelopmentStack } from "@/components/tower/TowerDevelopmentStack";
 import { useScrollStore } from "@/store/scrollStore";
+import { useIsTabletUi } from "@/hooks/useIsMobileUi";
 
 export function TowerOverlaySystem() {
   const sectionId = useScrollStore((s) => s.sectionId);
@@ -13,6 +14,8 @@ export function TowerOverlaySystem() {
   const featureWanted = useScrollStore((s) => s.towerFeatureVisible);
   const quality = useScrollStore((s) => s.qualityProfile);
   const cameraSettled = useScrollStore((s) => s.towerCameraSettled);
+  const towerTourStepped = useScrollStore((s) => s.towerTourStepped);
+  const tabletUi = useIsTabletUi();
 
   const chapter = towerChapters[chapterIndex] ?? towerChapters[0];
   const state =
@@ -23,17 +26,22 @@ export function TowerOverlaySystem() {
       )
     ] ?? chapter.featureStates[0];
 
+  const estateMode =
+    sceneMode === "estate" || sceneMode === "estate-overview";
+  // iPad demo: tour can be armed while ST still reports cover for a beat.
   const inTour =
-    sectionId === "hero" &&
-    (sceneMode === "estate" || sceneMode === "estate-overview");
+    estateMode &&
+    (sectionId === "hero" || (tabletUi && towerTourStepped));
   const storyBridge = useScrollStore((s) => s.storyBridge);
 
   const mobile = quality === "mobile" || quality === "reduced";
+  // iPad: don't wait on desktop settle — cards unlock with the beat.
+  const settleOk = cameraSettled || tabletUi;
 
   const profileVisible =
-    inTour && storyBridge === "none" && profileWanted && cameraSettled;
+    inTour && storyBridge === "none" && profileWanted && settleOk;
   const featureVisible =
-    inTour && storyBridge === "none" && featureWanted && cameraSettled;
+    inTour && storyBridge === "none" && featureWanted && settleOk;
 
   if (!inTour || storyBridge === "beyond" || !state) return null;
 

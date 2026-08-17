@@ -5,7 +5,7 @@ import gsap from "gsap";
 import { towerBeats, towerChapters } from "@/config/towerChapters";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useScrollStore } from "@/store/scrollStore";
-import { isMobileUiViewport } from "@/hooks/useIsMobileUi";
+import { isMobileUiViewport, isTabletUiViewport, isChromeTouchTarget } from "@/hooks/useIsMobileUi";
 import type { AnchorName } from "@/config/scene";
 
 /** Wheel delta to fill the charge and advance one tower beat */
@@ -13,6 +13,10 @@ const STEP_DELTA_THRESHOLD = 560;
 const KEY_CHARGE = 0.4;
 /** Touch swipe distance (px) to advance on mobile */
 const TOUCH_SWIPE_PX = 40;
+
+function skipCameraSettleGate() {
+  return isMobileUiViewport() || isTabletUiViewport();
+}
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
@@ -67,7 +71,7 @@ function isTourZone() {
 }
 
 function animateScrollTo(targetY: number, duration = 0.65) {
-  const dur = isMobileUiViewport() ? Math.min(duration, 0.38) : duration;
+  const dur = skipCameraSettleGate() ? Math.min(duration, 0.38) : duration;
   return new Promise<void>((resolve) => {
     const proxy = { y: window.scrollY };
     gsap.to(proxy, {
@@ -84,7 +88,10 @@ function animateScrollTo(targetY: number, duration = 0.65) {
   });
 }
 
-function applyBeat(index: number) {
+function applyBeat(
+  index: number,
+  opts?: { suppressCards?: boolean },
+) {
   const beat = towerBeats[Math.max(0, Math.min(towerBeats.length - 1, index))];
   if (!beat) return;
   const chapter = towerChapters[beat.chapterIndex];
@@ -97,15 +104,32 @@ function applyBeat(index: number) {
     store.setTowerCameraSettled(false);
   }
 
+  const profileVisible = opts?.suppressCards ? false : beat.profileVisible;
+  const featureVisible = opts?.suppressCards ? false : beat.featureVisible;
+
   store.setTowerJourney({
     towerBeatIndex: index,
     towerChapterIndex: beat.chapterIndex,
     towerLocalProgress: beat.chapterLocal,
-    towerProfileVisible: beat.profileVisible,
-    towerFeatureVisible: beat.featureVisible,
+    towerProfileVisible: profileVisible,
+    towerFeatureVisible: featureVisible,
     towerCameraCalm: beat.cameraCalm,
     towerFeatureStateIndex: beat.featureStateIndex,
   });
+
+  // Keep overlay inTour while ST still labels the section as cover after Next.
+  const tourT =
+    towerBeats.length <= 1 ? 0 : index / (towerBeats.length - 1);
+  store.setSection("hero", tourT);
+
+  // iPad/phone: never leave cards gated on slow desktop settle after Next
+  if (
+    skipCameraSettleGate() &&
+    !opts?.suppressCards &&
+    (beat.profileVisible || beat.featureVisible)
+  ) {
+    store.setTowerCameraSettled(true);
+  }
 
   if (!chapter.anchor) {
     store.setSceneMode("estate-overview");
@@ -250,9 +274,9 @@ export function useTowerTourSteps(enabled: boolean) {
       }
 
       const fromBeat = towerBeats[current];
-      // Desktop waits for camera settle on arrive; mobile must never soft-lock here.
+      // Phones + iPads must never soft-lock waiting for settle (expo buttons too).
       if (
-        !isMobileUiViewport() &&
+        !skipCameraSettleGate() &&
         fromBeat?.phase === "arrive" &&
         next > current &&
         !useScrollStore.getState().towerCameraSettled
@@ -264,8 +288,11 @@ export function useTowerTourSteps(enabled: boolean) {
       store.setStoryBridge("none");
       busyRef.current = true;
       chargeRef.current = 0;
-      applyBeat(next);
+      // Touch/iPad: hold cards until scroll lands — avoids flash then ST wipe
+      const deferCards = skipCameraSettleGate();
+      applyBeat(next, deferCards ? { suppressCards: true } : undefined);
       await animateScrollTo(yForBeat(next), 0.65);
+      if (deferCards) applyBeat(next);
       busyRef.current = false;
     };
 
@@ -305,7 +332,7 @@ export function useTowerTourSteps(enabled: boolean) {
 
       const currentBeat = towerBeats[towerBeatIndex];
       if (
-        !isMobileUiViewport() &&
+        !skipCameraSettleGate() &&
         storyBridge !== "beyond" &&
         currentBeat?.phase === "arrive" &&
         e.deltaY > 0 &&
@@ -347,7 +374,7 @@ export function useTowerTourSteps(enabled: boolean) {
         e.key === "ArrowDown" || e.key === " " || e.key === "PageDown";
       const currentBeat = towerBeats[towerBeatIndex];
       if (
-        !isMobileUiViewport() &&
+        !skipCameraSettleGate() &&
         storyBridge !== "beyond" &&
         forward &&
         currentBeat?.phase === "arrive" &&
@@ -365,12 +392,57 @@ export function useTowerTourSteps(enabled: boolean) {
       if (isTourZone() && !activeRef.current) {
         armIfNeeded();
       } else if (!isTourZone() && activeRef.current) {
+        // Don't drop the tour mid Next scroll — ST can briefly leave the zone
+        if (busyRef.current) return;
         setActive(false);
       }
     };
 
     const unsub = useScrollStore.subscribe(syncFromStore);
     syncFromStore();
+
+    let lastDemoNonce = useScrollStore.getState().demoStepNonce;
+    const unsubDemo = useScrollStore.subscribe((s) => {
+      if (s.demoStepNonce === lastDemoNonce) return;
+      lastDemoNonce = s.demoStepNonce;
+
+      // “Seven developments…” cover hold — Next enters Deansgate arrive.
+      // ST often leaves sectionId on "cover" until the next frame; a second
+      // Next must advance the tour, not re-fire arrive (DGS card stuck).
+      if (
+        s.experienceStarted &&
+        !s.demoIntroLock &&
+        s.sectionId === "cover"
+      ) {
+        if (busyRef.current) return;
+        if (s.demoStepDir < 0) return;
+
+        if (activeRef.current || s.towerTourStepped) {
+          chargeRef.current = 0;
+          const { towerBeatIndex } = useScrollStore.getState();
+          void goToBeat(towerBeatIndex + 1);
+          return;
+        }
+
+        void (async () => {
+          busyRef.current = true;
+          chargeRef.current = 0;
+          setActive(true);
+          applyBeat(0);
+          await animateScrollTo(yForBeat(0), 0.75);
+          busyRef.current = false;
+        })();
+        return;
+      }
+
+      if (!isTourZone()) return;
+      armIfNeeded();
+      if (busyRef.current) return;
+      const { towerBeatIndex } = useScrollStore.getState();
+      chargeRef.current = 0;
+      if (s.demoStepDir > 0) void goToBeat(towerBeatIndex + 1);
+      else void goToBeat(towerBeatIndex - 1);
+    });
 
     let touchY = 0;
     let touchStartY = 0;
@@ -379,9 +451,10 @@ export function useTowerTourSteps(enabled: boolean) {
       touchStartY = touchY;
     };
     const onTouchMove = (e: TouchEvent) => {
+      if (isChromeTouchTarget(e)) return;
       if (!isTourZone()) return;
-      // Mobile: don't preventDefault on move — advance on touchend instead.
-      if (isMobileUiViewport()) return;
+      // Phones + iPads: advance on touchend / demo buttons, not drag-charge.
+      if (skipCameraSettleGate()) return;
 
       const { towerCameraSettled, towerBeatIndex, storyBridge } =
         useScrollStore.getState();
@@ -396,6 +469,7 @@ export function useTowerTourSteps(enabled: boolean) {
 
       const currentBeat = towerBeats[towerBeatIndex];
       if (
+        !skipCameraSettleGate() &&
         storyBridge !== "beyond" &&
         currentBeat?.phase === "arrive" &&
         delta > 0 &&
@@ -409,7 +483,8 @@ export function useTowerTourSteps(enabled: boolean) {
       else if (chargeRef.current <= -1) void goToBeat(towerBeatIndex - 1);
     };
     const onTouchEnd = (e: TouchEvent) => {
-      if (!isMobileUiViewport()) return;
+      if (!skipCameraSettleGate()) return;
+      if (isChromeTouchTarget(e)) return;
       if (!isTourZone()) return;
 
       armIfNeeded();
@@ -433,6 +508,7 @@ export function useTowerTourSteps(enabled: boolean) {
 
     return () => {
       unsub();
+      unsubDemo();
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("touchstart", onTouchStart);

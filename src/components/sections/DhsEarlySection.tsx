@@ -13,12 +13,15 @@ import { DhsBusinessCard } from "@/components/demos/DhsBusinessCard";
 import { DhsVisionSearchCard } from "@/components/demos/DhsVisionSearchCard";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useScrollStore } from "@/store/scrollStore";
+import { isMobileUiViewport, isChromeTouchTarget } from "@/hooks/useIsMobileUi";
 import type { AnchorName } from "@/config/scene";
 
 /** Beyond on estate bridge; DHS: intro → 3 real searches → vision card → dashboard */
 const BEATS = 6;
 const STEP_DELTA_THRESHOLD = 520;
 const KEY_CHARGE = 0.4;
+/** Match tower tour — one clear swipe advances a beat on phones */
+const TOUCH_SWIPE_PX = 40;
 
 function dhsBounds() {
   const el = document.getElementById("section-dhs-early");
@@ -36,8 +39,9 @@ function yForDhsBeat(index: number) {
 }
 
 function animateScrollTo(targetY: number, duration = 0.65) {
+  const dur = isMobileUiViewport() ? Math.min(duration, 0.38) : duration;
   return new Promise<void>((resolve) => {
-    if (duration <= 0.01) {
+    if (dur <= 0.01) {
       window.scrollTo(0, targetY);
       resolve();
       return;
@@ -45,7 +49,7 @@ function animateScrollTo(targetY: number, duration = 0.65) {
     const proxy = { y: window.scrollY };
     gsap.to(proxy, {
       y: targetY,
-      duration,
+      duration: dur,
       ease: "power3.inOut",
       overwrite: true,
       onUpdate: () => window.scrollTo(0, proxy.y),
@@ -80,6 +84,7 @@ export function DhsEarlySection() {
   const armedRef = useRef(false);
   const exitingRef = useRef(false);
   const touchY = useRef<number | null>(null);
+  const touchStartY = useRef(0);
 
   const inDhs = sectionId === "dhs-early";
   const searchBeat = dhsBeatIndexToSearch(beat);
@@ -274,15 +279,25 @@ export function DhsEarlySection() {
     };
 
     const onTouchStart = (e: TouchEvent) => {
-      touchY.current = e.touches[0]?.clientY ?? null;
+      const y = e.touches[0]?.clientY ?? 0;
+      touchY.current = y;
+      touchStartY.current = y;
     };
     const onTouchMove = (e: TouchEvent) => {
+      if (isChromeTouchTarget(e)) return;
       const sid = useScrollStore.getState().sectionId;
       if (sid !== "dhs-early" || exitingRef.current) return;
       if (busyRef.current) {
         e.preventDefault();
         return;
       }
+      // Mobile: advance on touchend (same as estate tour) — charge-on-drag
+      // needs ~300px+ and feels like several swipes.
+      if (isMobileUiViewport()) {
+        e.preventDefault();
+        return;
+      }
+
       if (!activeRef.current) {
         activeRef.current = true;
         armedRef.current = true;
@@ -297,17 +312,56 @@ export function DhsEarlySection() {
       if (chargeRef.current >= 1) void goToBeat(beatRef.current + 1);
       else if (chargeRef.current <= -1) void goToBeat(beatRef.current - 1);
     };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!isMobileUiViewport()) return;
+      if (isChromeTouchTarget(e)) return;
+      const sid = useScrollStore.getState().sectionId;
+      if (sid !== "dhs-early" || exitingRef.current) return;
+      if (busyRef.current) return;
+
+      if (!activeRef.current) {
+        activeRef.current = true;
+        armedRef.current = true;
+      }
+
+      const y = e.changedTouches[0]?.clientY ?? touchStartY.current;
+      const dy = touchStartY.current - y;
+      if (Math.abs(dy) < TOUCH_SWIPE_PX) return;
+
+      chargeRef.current = 0;
+      if (dy > 0) void goToBeat(beatRef.current + 1);
+      else void goToBeat(beatRef.current - 1);
+    };
+
+    let lastDemoNonce = useScrollStore.getState().demoStepNonce;
+    const unsubDemo = useScrollStore.subscribe((s) => {
+      if (s.demoStepNonce === lastDemoNonce) return;
+      lastDemoNonce = s.demoStepNonce;
+      const sid = s.sectionId;
+      if (sid !== "dhs-early" || exitingRef.current) return;
+      if (busyRef.current) return;
+      if (!activeRef.current) {
+        activeRef.current = true;
+        armedRef.current = true;
+      }
+      chargeRef.current = 0;
+      if (s.demoStepDir > 0) void goToBeat(beatRef.current + 1);
+      else void goToBeat(beatRef.current - 1);
+    });
 
     window.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("keydown", onKey);
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
 
     return () => {
+      unsubDemo();
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
     };
   }, [reduced, setActiveBusinesses]);
 
@@ -318,7 +372,7 @@ export function DhsEarlySection() {
       aria-labelledby="dhs-heading"
     >
       <div
-        className={`pointer-events-none fixed inset-0 z-[15] flex items-end pb-[12vh] md:items-center md:pb-0 ${
+        className={`pointer-events-none fixed inset-0 z-[15] flex items-end pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(4.5rem,env(safe-area-inset-top))] md:items-center md:pb-0 md:pt-0 ${
           inDhs ? "" : "invisible"
         }`}
         aria-hidden={!inDhs}
