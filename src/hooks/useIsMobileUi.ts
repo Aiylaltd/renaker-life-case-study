@@ -27,13 +27,47 @@ export function isTabletUiViewport() {
   return window.matchMedia(TABLET_UI_MEDIA).matches;
 }
 
-/** Touches on top nav / demo chrome — don't steal for section steppers */
+/** Last touch Y for direction while deciding card-vs-tour handoff */
+let chromeTouchY: number | undefined;
+
+/**
+ * Touches/wheels the tour should not steal:
+ * - nav / demo chrome
+ * - building cards while they can still scroll in that direction
+ *   (at the edge, or with no overflow, hand off to scroll-to-continue)
+ */
 export function isChromeTouchTarget(e: Event) {
   const t = e.target;
-  return (
-    t instanceof Element &&
-    !!t.closest(".tower-case-nav, .demo-step-controls")
-  );
+  if (!(t instanceof Element)) return false;
+  if (t.closest(".tower-case-nav, .demo-step-controls")) return true;
+
+  const panel = t.closest(".tower-stack__feature, .tower-card");
+  if (!(panel instanceof HTMLElement)) return false;
+  if (panel.scrollHeight <= panel.clientHeight + 1) return false;
+
+  let dy = 0;
+  if (e instanceof WheelEvent) {
+    dy = e.deltaY;
+  } else if (e instanceof TouchEvent) {
+    const point = e.touches[0] ?? e.changedTouches[0];
+    if (point) {
+      const prev =
+        typeof chromeTouchY === "number" ? chromeTouchY : point.clientY;
+      dy = prev - point.clientY;
+      chromeTouchY = point.clientY;
+    }
+  }
+
+  if (dy === 0) return true;
+  if (dy < 0 && panel.scrollTop <= 0) return false;
+  if (dy > 0 && panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1) {
+    return false;
+  }
+  return true;
+}
+
+export function seedChromeTouchY(y: number) {
+  chromeTouchY = y;
 }
 
 /**

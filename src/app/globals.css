@@ -1744,12 +1744,14 @@
 
   .tower-stack--expanded.tower-stack--living .tower-stack__feature {
     max-height: min(72vh, 720px);
-    overflow: visible;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .tower-stack--expanded.tower-stack--living .tower-stack__shell {
     max-height: min(92vh, 920px);
-    overflow: visible;
+    overflow: hidden;
   }
 
   .tower-stack__shell {
@@ -1812,8 +1814,9 @@
     padding: 1.35rem 1.35rem 1.1rem;
     border-bottom-color: rgba(10, 10, 11, 0.07);
     max-height: min(64vh, 620px);
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .tower-stack--admin.tower-stack--expanded .tower-stack__feature {
@@ -1961,7 +1964,9 @@
     width: min(820px, calc(100vw - 2.5rem));
     max-height: min(78vh, 720px);
     padding: 1.65rem 1.75rem 1.75rem;
-    overflow: hidden;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     opacity: 0;
     transform: translate(-50%, calc(-50% + 14px));
     border-radius: 30px;
@@ -2935,10 +2940,12 @@
     color: var(--color-ink);
   }
 
-  /* Outcome beats are short — don't leave a tall empty feature well */
+  /* Outcome beats — keep scrollable so short viewports don't clip copy */
   .tower-stack--expanded.tower-stack--outcome .tower-stack__feature {
-    max-height: none;
-    overflow: visible;
+    max-height: min(64vh, 620px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .tower-overlay--mobile .tower-stack {
@@ -2956,6 +2963,14 @@
     max-height: min(72vh, 620px);
   }
 
+  .tower-overlay--mobile .tower-stack--expanded .tower-stack__feature,
+  .tower-overlay--lite .tower-stack--expanded .tower-stack__feature {
+    max-height: min(52vh, 480px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
   .tower-overlay--mobile .tower-card {
     left: 1rem;
     right: 1rem;
@@ -2964,6 +2979,9 @@
     bottom: 1rem;
     transform: translateY(12px);
     max-height: min(68vh, 560px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .tower-overlay--mobile .tower-card--in {

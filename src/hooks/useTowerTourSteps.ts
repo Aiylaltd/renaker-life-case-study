@@ -5,7 +5,7 @@ import gsap from "gsap";
 import { towerBeats, towerChapters } from "@/config/towerChapters";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useScrollStore } from "@/store/scrollStore";
-import { isMobileUiViewport, isTabletUiViewport, isChromeTouchTarget } from "@/hooks/useIsMobileUi";
+import { isMobileUiViewport, isTabletUiViewport, isChromeTouchTarget, seedChromeTouchY } from "@/hooks/useIsMobileUi";
 import type { AnchorName } from "@/config/scene";
 
 /** Wheel delta to fill the charge and advance one tower beat */
@@ -13,6 +13,8 @@ const STEP_DELTA_THRESHOLD = 560;
 const KEY_CHARGE = 0.4;
 /** Touch swipe distance (px) to advance on mobile */
 const TOUCH_SWIPE_PX = 40;
+/** Phone-only pause after a beat advance — stops chained skip into Beyond/DHS */
+const MOBILE_STEP_COOLDOWN_MS = 450;
 
 function skipCameraSettleGate() {
   return isMobileUiViewport() || isTabletUiViewport();
@@ -178,6 +180,7 @@ export function useTowerTourSteps(enabled: boolean) {
   const chargeRef = useRef(0);
   const busyRef = useRef(false);
   const activeRef = useRef(false);
+  const stepCooldownUntilRef = useRef(0);
 
   useEffect(() => {
     if (!enabled || reduced) {
@@ -234,6 +237,13 @@ export function useTowerTourSteps(enabled: boolean) {
 
     const goToBeat = async (next: number) => {
       if (busyRef.current) return;
+      // Phone only: block chained advances that skip past Castle Wharf into Beyond/DHS
+      if (
+        isMobileUiViewport() &&
+        Date.now() < stepCooldownUntilRef.current
+      ) {
+        return;
+      }
       const store = useScrollStore.getState();
       const current = store.towerBeatIndex;
 
@@ -287,6 +297,9 @@ export function useTowerTourSteps(enabled: boolean) {
 
       store.setStoryBridge("none");
       busyRef.current = true;
+      if (isMobileUiViewport()) {
+        stepCooldownUntilRef.current = Date.now() + MOBILE_STEP_COOLDOWN_MS;
+      }
       chargeRef.current = 0;
       // Touch/iPad: hold cards until scroll lands — avoids flash then ST wipe
       const deferCards = skipCameraSettleGate();
@@ -318,6 +331,8 @@ export function useTowerTourSteps(enabled: boolean) {
     };
 
     const onWheel = (e: WheelEvent) => {
+      if (isChromeTouchTarget(e)) return;
+
       const { towerCameraSettled, towerBeatIndex, storyBridge } =
         useScrollStore.getState();
 
@@ -449,6 +464,7 @@ export function useTowerTourSteps(enabled: boolean) {
     const onTouchStart = (e: TouchEvent) => {
       touchY = e.touches[0]?.clientY ?? 0;
       touchStartY = touchY;
+      seedChromeTouchY(touchY);
     };
     const onTouchMove = (e: TouchEvent) => {
       if (isChromeTouchTarget(e)) return;
