@@ -13,6 +13,8 @@ const STEP_DELTA_THRESHOLD = 560;
 const KEY_CHARGE = 0.4;
 /** Touch swipe distance (px) to advance on mobile */
 const TOUCH_SWIPE_PX = 40;
+/** Harder to reverse — stops rubber-band / slight down-swipes exiting the tour */
+const TOUCH_SWIPE_BACK_PX = 90;
 /** Phone-only pause after a beat advance — stops chained skip into Beyond/DHS */
 const MOBILE_STEP_COOLDOWN_MS = 450;
 
@@ -263,6 +265,13 @@ export function useTowerTourSteps(enabled: boolean) {
       }
 
       if (next < 0) {
+        // Mobile: never swipe back out of the tour into the cover screen.
+        // Accidental down-swipes / iOS rubber-banding were dumping people
+        // off Deansgate arrive (beat 0) back to the previous section.
+        if (isMobileUiViewport() || isTabletUiViewport()) {
+          chargeRef.current = 0;
+          return;
+        }
         setActive(false);
         store.setStoryBridge("none");
         const cover = document.getElementById("section-cover");
@@ -461,10 +470,15 @@ export function useTowerTourSteps(enabled: boolean) {
 
     let touchY = 0;
     let touchStartY = 0;
+    let touchStartedOnCard = false;
     const onTouchStart = (e: TouchEvent) => {
       touchY = e.touches[0]?.clientY ?? 0;
       touchStartY = touchY;
       seedChromeTouchY(touchY);
+      const t = e.target;
+      touchStartedOnCard =
+        t instanceof Element &&
+        !!t.closest(".tower-stack__feature, .tower-card");
     };
     const onTouchMove = (e: TouchEvent) => {
       if (isChromeTouchTarget(e)) return;
@@ -508,11 +522,18 @@ export function useTowerTourSteps(enabled: boolean) {
 
       const y = e.changedTouches[0]?.clientY ?? touchStartY;
       const dy = touchStartY - y;
-      if (Math.abs(dy) < TOUCH_SWIPE_PX) return;
+      const forward = dy > 0;
+      const need = forward ? TOUCH_SWIPE_PX : TOUCH_SWIPE_BACK_PX;
+      if (Math.abs(dy) < need) return;
+
+      // Card gestures: don't reverse the tour from a down-swipe on the card
+      // (rubber-band / scroll attempt). Forward still works at the edge via
+      // isChromeTouchTarget returning false.
+      if (touchStartedOnCard && !forward) return;
 
       const { towerBeatIndex } = useScrollStore.getState();
       chargeRef.current = 0;
-      if (dy > 0) void goToBeat(towerBeatIndex + 1);
+      if (forward) void goToBeat(towerBeatIndex + 1);
       else void goToBeat(towerBeatIndex - 1);
     };
 
