@@ -18,6 +18,9 @@ const TOUCH_SWIPE_BACK_PX = 90;
 /** Phone-only pause after a beat advance — stops chained skip into Beyond/DHS */
 const MOBILE_STEP_COOLDOWN_MS = 450;
 
+/** Desktop: don't soft-lock forever waiting for settle on first DGS arrive */
+const DESKTOP_ARRIVE_UNLOCK_MS = 700;
+
 function skipCameraSettleGate() {
   return isMobileUiViewport() || isTabletUiViewport();
 }
@@ -126,13 +129,26 @@ function applyBeat(
     towerBeats.length <= 1 ? 0 : index / (towerBeats.length - 1);
   store.setSection("hero", tourT);
 
-  // iPad/phone: never leave cards gated on slow desktop settle after Next
+  // iPad/phone: unlock cards with the beat. Desktop: failsafe so first DGS
+  // fly-in can't leave the profile card gated on a missed settle.
   if (
-    skipCameraSettleGate() &&
     !opts?.suppressCards &&
     (beat.profileVisible || beat.featureVisible)
   ) {
-    store.setTowerCameraSettled(true);
+    if (skipCameraSettleGate()) {
+      store.setTowerCameraSettled(true);
+    } else {
+      window.setTimeout(() => {
+        const s = useScrollStore.getState();
+        if (
+          s.towerBeatIndex === index &&
+          (s.towerProfileVisible || s.towerFeatureVisible) &&
+          !s.towerCameraSettled
+        ) {
+          s.setTowerCameraSettled(true);
+        }
+      }, 550);
+    }
   }
 
   if (!chapter.anchor) {
@@ -183,6 +199,8 @@ export function useTowerTourSteps(enabled: boolean) {
   const busyRef = useRef(false);
   const activeRef = useRef(false);
   const stepCooldownUntilRef = useRef(0);
+  /** When arrive beat started waiting on settle (desktop first DGS unlock) */
+  const arriveWaitStartedRef = useRef(0);
 
   useEffect(() => {
     if (!enabled || reduced) {
@@ -193,7 +211,35 @@ export function useTowerTourSteps(enabled: boolean) {
     const setActive = (on: boolean) => {
       activeRef.current = on;
       useScrollStore.getState().setTowerTourStepped(on);
-      if (!on) chargeRef.current = 0;
+      if (!on) {
+        chargeRef.current = 0;
+        arriveWaitStartedRef.current = 0;
+      }
+    };
+
+    const arriveSettleBlocksForward = () => {
+      if (skipCameraSettleGate()) return false;
+      const { towerCameraSettled, towerBeatIndex, storyBridge } =
+        useScrollStore.getState();
+      if (storyBridge === "beyond") return false;
+      const beat = towerBeats[towerBeatIndex];
+      if (beat?.phase !== "arrive" || towerCameraSettled) {
+        arriveWaitStartedRef.current = 0;
+        return false;
+      }
+      if (!arriveWaitStartedRef.current) {
+        arriveWaitStartedRef.current = performance.now();
+      }
+      // First fly-in: briefly hold, then unlock so DGS profile isn't unreachable
+      if (
+        performance.now() - arriveWaitStartedRef.current >=
+        DESKTOP_ARRIVE_UNLOCK_MS
+      ) {
+        useScrollStore.getState().setTowerCameraSettled(true);
+        arriveWaitStartedRef.current = 0;
+        return false;
+      }
+      return true;
     };
 
     const enterBeyondBridge = async () => {
@@ -294,11 +340,11 @@ export function useTowerTourSteps(enabled: boolean) {
 
       const fromBeat = towerBeats[current];
       // Phones + iPads must never soft-lock waiting for settle (expo buttons too).
+      // Desktop: brief arrive hold, then force-unlock so first DGS card can appear.
       if (
-        !skipCameraSettleGate() &&
         fromBeat?.phase === "arrive" &&
         next > current &&
-        !useScrollStore.getState().towerCameraSettled
+        arriveSettleBlocksForward()
       ) {
         chargeRef.current = Math.min(0.8, chargeRef.current);
         return;
@@ -342,8 +388,7 @@ export function useTowerTourSteps(enabled: boolean) {
     const onWheel = (e: WheelEvent) => {
       if (isChromeTouchTarget(e)) return;
 
-      const { towerCameraSettled, towerBeatIndex, storyBridge } =
-        useScrollStore.getState();
+      const { towerBeatIndex, storyBridge } = useScrollStore.getState();
 
       if (!isTourZone()) {
         if (activeRef.current) setActive(false);
@@ -356,11 +401,10 @@ export function useTowerTourSteps(enabled: boolean) {
 
       const currentBeat = towerBeats[towerBeatIndex];
       if (
-        !skipCameraSettleGate() &&
         storyBridge !== "beyond" &&
         currentBeat?.phase === "arrive" &&
         e.deltaY > 0 &&
-        !towerCameraSettled
+        arriveSettleBlocksForward()
       ) {
         return;
       }
@@ -376,8 +420,7 @@ export function useTowerTourSteps(enabled: boolean) {
     };
 
     const onKey = (e: KeyboardEvent) => {
-      const { towerCameraSettled, towerBeatIndex, storyBridge } =
-        useScrollStore.getState();
+      const { towerBeatIndex, storyBridge } = useScrollStore.getState();
       if (!isTourZone()) return;
 
       if (
@@ -398,11 +441,10 @@ export function useTowerTourSteps(enabled: boolean) {
         e.key === "ArrowDown" || e.key === " " || e.key === "PageDown";
       const currentBeat = towerBeats[towerBeatIndex];
       if (
-        !skipCameraSettleGate() &&
         storyBridge !== "beyond" &&
         forward &&
         currentBeat?.phase === "arrive" &&
-        !towerCameraSettled
+        arriveSettleBlocksForward()
       ) {
         return;
       }

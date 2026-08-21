@@ -393,15 +393,19 @@ export function CameraDirector() {
       const posDist = camera.position.distanceTo(_desiredPos);
       const lookDist = lookAt.current.distanceTo(_desiredTarget);
       const mobile = isMobileUiViewport() || isTabletUiViewport();
+      const wantsCard =
+        state.towerProfileVisible || state.towerFeatureVisible;
+      // Desktop first fly-in into DGS often sits just outside the old 90/70
+      // band — looser distance + faster timer so the card can unlock.
       const closeEnough = mobile
         ? posDist < 160 && lookDist < 120
-        : posDist < 90 && lookDist < 70;
+        : posDist < 140 && lookDist < 110;
       settledHold.current += dt;
-      const settleAfter = mobile ? 0.35 : 1.1;
+      const settleAfter = mobile ? 0.35 : wantsCard ? 0.45 : 0.6;
       // Distance settle OR time fallback so cards can never get stuck hidden
       if (
         !state.towerCameraSettled &&
-        ((closeEnough && settledHold.current > 0.15) ||
+        ((closeEnough && settledHold.current > 0.12) ||
           settledHold.current > settleAfter)
       ) {
         setTowerCameraSettled(true);
